@@ -121,45 +121,46 @@ writer_role = st.selectbox(
 
 # Options (no longer called "advanced")
 col1, col2 = st.columns(2)
-    with col1:
-        content_type = st.selectbox(
-            "Content Type",
-            ["News", "Investigation", "Feature", "Essay", "Review", "Other"],
-            index=0
-        )
-        
-        target_audience = st.selectbox(
-            "Target Audience", 
-            ["General readers", "Specialists", "Students", "Other"],
-            index=0
-        )
-        
-        process_stage = st.selectbox(
-            "Process Stage",
-            ["Draft review", "Polish/copy edit", "Fact-check focus"],
-            index=0
-        )
-    
-    with col2:
-        category_emphasis = st.selectbox(
-            "Category Emphasis",
-            ["Comprehensive", "Fact-checking heavy", "Style focus", "Structure focus"],
-            index=0
-        )
-        
-        style_guide = st.selectbox(
-            "Style Guide",
-            ["AP", "Chicago", "MLA", "APA", "House style", "Other"],
-            index=0
-        )
-        
-        target_length = st.text_input("Target Length (optional)", placeholder="e.g., 800 words")
-    
-    custom_context = st.text_area(
-        "Custom Editor Context (optional)",
-        placeholder="Any specific guidance for the editorial team...",
-        height=80
+
+with col1:
+    content_type = st.selectbox(
+        "Content Type",
+        ["News", "Investigation", "Feature", "Essay", "Review", "Other"],
+        index=0
     )
+    
+    target_audience = st.selectbox(
+        "Target Audience", 
+        ["General readers", "Specialists", "Students", "Other"],
+        index=0
+    )
+    
+    process_stage = st.selectbox(
+        "Process Stage",
+        ["Draft review", "Polish/copy edit", "Fact-check focus"],
+        index=0
+    )
+
+with col2:
+    category_emphasis = st.selectbox(
+        "Category Emphasis",
+        ["Comprehensive", "Fact-checking heavy", "Style focus", "Structure focus"],
+        index=0
+    )
+    
+    style_guide = st.selectbox(
+        "Style Guide",
+        ["AP", "Chicago", "MLA", "APA", "House style", "Other"],
+        index=0
+    )
+    
+    target_length = st.text_input("Target Length (optional)", placeholder="e.g., 800 words")
+
+custom_context = st.text_area(
+    "Custom Editor Context (optional)",
+    placeholder="Any specific guidance for the editorial team...",
+    height=80
+)
 
 # Article input section
 st.markdown("## 📄 Step 2: Your Article")
