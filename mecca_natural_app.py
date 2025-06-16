@@ -1,7 +1,9 @@
+# MECCA UI v3 - test functions
 import streamlit as st
 import os
 # from mecca_natural_calls import call_openai, call_anthropic, call_google, call_perplexity
 # from mecca_natural_prompts import get_model_prompts
+
 def call_openai(prompt, key): return "Test response"
 def call_anthropic(prompt, combined, key): return "Test response"
 def call_google(prompt, key): return "Test response" 
