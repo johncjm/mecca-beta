@@ -1,7 +1,12 @@
 import streamlit as st
 import os
-from mecca_natural_calls import call_openai, call_anthropic, call_google, call_perplexity
-from mecca_natural_prompts import get_model_prompts
+# from mecca_natural_calls import call_openai, call_anthropic, call_google, call_perplexity
+# from mecca_natural_prompts import get_model_prompts
+def call_openai(prompt, key): return "Test response"
+def call_anthropic(prompt, combined, key): return "Test response"
+def call_google(prompt, key): return "Test response" 
+def call_perplexity(prompt, key): return "Test response"
+def get_model_prompts(text, context): return {"gpt": "test", "gemini": "test", "perplexity": "test", "claude": "test"}
 
 # Configure page
 st.set_page_config(
