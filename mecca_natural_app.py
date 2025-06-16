@@ -1,4 +1,3 @@
-# MECCA v4 - FINAL VERSION WITH CORRECT IMPORTS
 import streamlit as st
 import os
 from mecca_natural_calls import call_openai, call_anthropic, call_google, call_perplexity
@@ -83,19 +82,19 @@ with st.container():
         
         The system provides paragraph-specific feedback for maximum actionability and adapts to your specific content requirements.
         
-        **Advanced Customization Options:**
+        **Customization Options:**
         
-        **Content Type:** News, Investigation, Feature, Essay, Review, or Other - each gets specialized feedback appropriate to the format
+        **Writer Role:** Professional journalist, Student journalist, Academic writer, Content creator - affects tone and depth of feedback
         
-        **Target Audience:** General readers, Specialists, Students, or custom audience - feedback adapts to your readers' needs
+        **Editorial Role:** Copy Editor, Writing Coach, News Desk Editor, Feature Editor - determines how feedback is delivered
         
-        **Process Stage:** Draft review, Polish/copy edit, or Fact-check focus - emphasizes different editorial priorities
+        **Content Type:** News, Investigation, Feature, Essay, Review, or Other - specialized feedback for each format
         
-        **Category Emphasis:** Comprehensive, Fact-checking heavy, Style focus, or Structure focus - tailors the depth and type of feedback
+        **Publication Style:** Edit in the style of major publications like NYT, WSJ, etc. - matches industry standards
         
-        **Style Guide:** AP, Chicago, MLA, APA, House style, or Other - ensures consistency with your publication standards
+        **Category Emphasis:** What type of editing focus - fact-checking, style, structure, comprehensive
         
-        **Target Length & Custom Context:** Additional guidance to help editors understand your specific needs
+        **Target Audience, Process Stage, Style Guide:** Further customization for specific needs
         
         **Best Practices for Using MECCA:**
         
@@ -120,14 +119,36 @@ writer_role = st.selectbox(
     help="This helps MECCA adjust the tone and depth of feedback"
 )
 
-# Options (no longer called "advanced")
+# Editorial approach selection
 col1, col2 = st.columns(2)
 
 with col1:
+    editorial_role = st.selectbox(
+        "Editorial Role",
+        ["Copy Editor", "Writing Coach", "News Desk Editor", "Feature Editor", "Fact-Checker Focus", "Style Editor"],
+        index=1,  # Default to Writing Coach
+        help="How should the editors approach your work?"
+    )
+    
+    publication_style = st.selectbox(
+        "Publication Style",
+        ["House Style", "New York Times", "Wall Street Journal", "Washington Post", "The Guardian", "Associated Press", "Reuters", "The Atlantic", "New Yorker", "Politico", "Other"],
+        index=0,
+        help="Edit in the style of which publication?"
+    )
+    
     content_type = st.selectbox(
         "Content Type",
         ["News", "Investigation", "Feature", "Essay", "Review", "Other"],
         index=0
+    )
+
+with col2:
+    category_emphasis = st.selectbox(
+        "Category Emphasis",
+        ["Comprehensive", "Fact-checking heavy", "Style focus", "Structure focus"],
+        index=0,
+        help="What type of editing focus?"
     )
     
     target_audience = st.selectbox(
@@ -142,19 +163,17 @@ with col1:
         index=0
     )
 
-with col2:
-    category_emphasis = st.selectbox(
-        "Category Emphasis",
-        ["Comprehensive", "Fact-checking heavy", "Style focus", "Structure focus"],
-        index=0
-    )
-    
+# Additional options
+col3, col4 = st.columns(2)
+
+with col3:
     style_guide = st.selectbox(
         "Style Guide",
         ["AP", "Chicago", "MLA", "APA", "House style", "Other"],
         index=0
     )
-    
+
+with col4:
     target_length = st.text_input("Target Length (optional)", placeholder="e.g., 800 words")
 
 custom_context = st.text_area(
@@ -206,7 +225,9 @@ if analyze_button and article_text.strip():
             "target_length": target_length,
             "custom_context": custom_context,
             "headline": headline,
-            "writer_role": writer_role
+            "writer_role": writer_role,
+            "editorial_role": editorial_role,
+            "publication_style": publication_style
         }
         
         # Map writer role to expected format
