@@ -1,7 +1,7 @@
 import streamlit as st
 import os
 from mecca_natural_calls import call_openai, call_anthropic, call_google, call_perplexity
-from mecca_natural_prompts import get_model_prompts
+from mecca_natural_prompts import get_editorial_prompt, get_eic_synthesis_prompt
 
 # Configure page
 st.set_page_config(
@@ -208,13 +208,20 @@ if analyze_button and article_text.strip():
             "writer_role": writer_role
         }
         
-        # Get model prompts
-        prompts = get_model_prompts(article_text, context)
+        # Map writer role to expected format
+        role_mapping = {
+            "Professional journalist": "professional",
+            "Student journalist": "student", 
+            "Academic writer": "other",
+            "Content creator": "other",
+            "Other writer": "other"
+        }
+        mapped_role = role_mapping.get(writer_role, "other")
         
         # Call individual models
-        gpt_response = call_openai(prompts["gpt"], openai_key) if openai_key else "OpenAI API key not configured"
-        gemini_response = call_google(prompts["gemini"], google_key) if google_key else "Google API key not configured"
-        perplexity_response = call_perplexity(prompts["perplexity"], perplexity_key) if perplexity_key else "Perplexity API key not configured"
+        gpt_response = call_openai(get_editorial_prompt("gpt-4o", article_text, mapped_role, context), openai_key) if openai_key else "OpenAI API key not configured"
+        gemini_response = call_google(get_editorial_prompt("gemini", article_text, mapped_role, context), google_key) if google_key else "Google API key not configured"
+        perplexity_response = call_perplexity(get_editorial_prompt("perplexity", article_text, mapped_role, context), perplexity_key) if perplexity_key else "Perplexity API key not configured"
         
         # Prepare combined responses for EiC
         combined_analysis = f"""
@@ -229,7 +236,8 @@ Perplexity Fact-Checker Response:
         """
         
         # Call Claude as Editor-in-Chief
-        claude_response = call_anthropic(prompts["claude"], combined_analysis, anthropic_key) if anthropic_key else "Anthropic API key not configured"
+        claude_eic_prompt = get_eic_synthesis_prompt(gpt_response, gemini_response, "", perplexity_response, mapped_role, context)
+        claude_response = call_anthropic(claude_eic_prompt, combined_analysis, anthropic_key) if anthropic_key else "Anthropic API key not configured"
 
     # AI Disclaimer
     st.markdown("""
