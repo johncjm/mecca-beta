@@ -1,14 +1,7 @@
-# MECCA UI v3 - test functions
 import streamlit as st
 import os
-# from mecca_natural_calls import call_openai, call_anthropic, call_google, call_perplexity
-# from mecca_natural_prompts import get_model_prompts
-
-def call_openai(prompt, key): return "Test response"
-def call_anthropic(prompt, combined, key): return "Test response"
-def call_google(prompt, key): return "Test response" 
-def call_perplexity(prompt, key): return "Test response"
-def get_model_prompts(text, context): return {"gpt": "test", "gemini": "test", "perplexity": "test", "claude": "test"}
+from mecca_natural_calls import call_openai, call_anthropic, call_google, call_perplexity
+from mecca_natural_prompts import get_model_prompts
 
 # Configure page
 st.set_page_config(
@@ -18,7 +11,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Custom CSS for better styling v2
+# Custom CSS for better styling
 st.markdown("""
 <style>
     .main-header {
@@ -67,7 +60,6 @@ st.markdown("""
 
 # Main header
 st.markdown('<div class="main-header">📝 MECCA</div>', unsafe_allow_html=True)
-st.markdown('<p style="text-align: center; font-size: 1.2rem; color: #666; margin-top: -1rem;">Your AI Editorial Team</p>', unsafe_allow_html=True)
 
 # About MECCA section (collapsible)
 with st.container():
@@ -75,11 +67,7 @@ with st.container():
     
     # Always visible preview
     st.markdown("""
-    **MECCA simulates a real editorial team** by using multiple AI models, each bringing different strengths:
-    
-    • **GPT-4**: Comprehensive editorial analysis and writing guidance  
-    • **Gemini**: Systematic issue categorization and structural feedback  
-    • **Perplexity**: Real-time fact-checking with web search capabilities
+    The **Multiple Edit and Cross-Check Assistant** aims to **HELP** writers and editors, not **REPLACE** them. It won't write or rewrite your copy; it will check facts, flag typos and other problems and make suggestions. To offset the limits of AI bots, it brings several different models into the mix. To make the results easy to digest, it assigns another bot to act as Editor in Chief and synthesize feedback.
     """)
     
     # Expandable details
@@ -87,9 +75,12 @@ with st.container():
         st.markdown("""
         **How MECCA Works:**
         
-        • **Claude** serves as Editor-in-Chief, synthesizing all feedback into actionable priorities using editorial best practices and your specific content requirements
-        • The system provides paragraph-specific feedback for maximum actionability
-        • Advanced options let you customize feedback for different content types, audiences, and style guides
+        • **GPT-4**: Comprehensive editorial analysis and writing guidance  
+        • **Gemini**: Systematic issue categorization and structural feedback  
+        • **Perplexity**: Real-time fact-checking with web search capabilities
+        • **Claude**: Serves as Editor-in-Chief, synthesizing all feedback into actionable priorities
+        
+        The system provides paragraph-specific feedback for maximum actionability and adapts to your specific content requirements.
         
         **Advanced Customization Options:**
         
@@ -116,26 +107,20 @@ with st.container():
     
     st.markdown('</div>', unsafe_allow_html=True)
 
-# Model selection
-with st.container():
-    st.markdown('<div class="model-selection">', unsafe_allow_html=True)
-    st.markdown("**👥 Selected Editorial Team:**")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        # Always show GPT-4, Gemini, Perplexity as selected
-        st.success("✓ GPT-4 Editor, Gemini Editor, Perplexity Fact-Checker")
-    
-    with col2:
-        st.info("**Editor-in-Chief:** Claude (synthesizes all feedback)")
-    
-    st.markdown('</div>', unsafe_allow_html=True)
+# Writer context and options
+st.markdown("## 📝 Step 1: Tell us about you and what you're working on")
+st.markdown("*The models work best when they're given this kind of context. (All items are optional.)*")
 
-# Advanced Options (simplified, single column)
-with st.expander("⚙️ Advanced Options"):
-    col1, col2 = st.columns(2)
-    
+# Writer role selection
+writer_role = st.selectbox(
+    "What describes you best?",
+    ["Professional journalist", "Student journalist", "Academic writer", "Content creator", "Other writer"],
+    index=0,
+    help="This helps MECCA adjust the tone and depth of feedback"
+)
+
+# Options (no longer called "advanced")
+col1, col2 = st.columns(2)
     with col1:
         content_type = st.selectbox(
             "Content Type",
@@ -177,7 +162,7 @@ with st.expander("⚙️ Advanced Options"):
     )
 
 # Article input section
-st.markdown("## 📝 Article")
+st.markdown("## 📄 Step 2: Your Article")
 
 headline = st.text_input(
     "**Headline:**",
@@ -218,7 +203,8 @@ if analyze_button and article_text.strip():
             "style_guide": style_guide,
             "target_length": target_length,
             "custom_context": custom_context,
-            "headline": headline
+            "headline": headline,
+            "writer_role": writer_role
         }
         
         # Get model prompts
