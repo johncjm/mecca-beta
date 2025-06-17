@@ -55,6 +55,14 @@ st.markdown("""
         border-radius: 8px;
         margin-bottom: 1rem;
     }
+    .word-limit-notice {
+        background-color: #e7f3ff;
+        padding: 0.8rem;
+        border-radius: 6px;
+        border-left: 3px solid #1f77b4;
+        margin-bottom: 1rem;
+        font-size: 0.9rem;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -75,18 +83,25 @@ with st.container():
         st.markdown("""
         **How MECCA Works:**
         
-        • **GPT-4**: Comprehensive editorial analysis and writing guidance  
-        • **Gemini**: Systematic issue categorization and structural feedback  
-        • **Perplexity**: Real-time fact-checking with web search capabilities
-        • **Claude**: Serves as Editor-in-Chief, synthesizing all feedback into actionable priorities
+        MECCA uses a **hybrid specialization approach** - each AI editor has a primary focus area while maintaining oversight for critical issues that could harm credibility:
         
-        The system provides paragraph-specific feedback for maximum actionability and adapts to your specific content requirements.
+        • **GPT-4 (Fact-Checking Lead)**: Primary focus on verification, sourcing, and accuracy. Also flags critical credibility issues in other areas.
+        • **Gemini (Structure/Flow Lead)**: Primary focus on organization, clarity, and reader comprehension. Also flags critical credibility issues in other areas.
+        • **Perplexity (Real-time Verification)**: Web search capabilities for current fact-checking and source verification.
+        • **Claude (Editor-in-Chief)**: Synthesizes all feedback using the "embarrassment test" - prioritizing issues that would most embarrass the publication if published.
+        
+        **Key Features:**
+        
+        • **Specialized but Safe**: Each editor focuses on their strength while maintaining a safety net for critical issues
+        • **Custom Context Override**: Your specific instructions always take priority over default editorial approaches
+        • **Paragraph-Specific Feedback**: All suggestions reference specific paragraphs for maximum actionability
+        • **Educational Support**: Student writers receive additional encouragement and teaching moments
         
         **Customization Options:**
         
         **Writer Role:** Professional journalist, Student journalist, Academic writer, Content creator - affects tone and depth of feedback
         
-        **Editorial Role:** Copy Editor, Writing Coach, News Desk Editor, Feature Editor - determines how feedback is delivered
+        **Editorial Approach:** Determines how the AI editors approach your work - copy editing focus, coaching style, newsroom standards, etc.
         
         **Content Type:** News, Investigation, Feature, Essay, Review, or Other - specialized feedback for each format
         
@@ -96,6 +111,8 @@ with st.container():
         
         **Target Audience, Process Stage, Style Guide:** Further customization for specific needs
         
+        **Custom Context:** Override default editorial approaches with your specific requirements
+        
         **Best Practices for Using MECCA:**
         
         • Treat feedback as advisory - you maintain full editorial control
@@ -103,6 +120,7 @@ with st.container():
         • Verify all factual claims independently
         • Consider feedback in context of your publication's standards
         • Most effective for articles 200+ words with clear structure
+        • Use Custom Context to specify any special requirements or override default approaches
         """)
     
     st.markdown('</div>', unsafe_allow_html=True)
@@ -124,10 +142,10 @@ col1, col2 = st.columns(2)
 
 with col1:
     editorial_role = st.selectbox(
-        "Editorial Role",
+        "How should the editors approach your work?",
         ["Copy Editor", "Writing Coach", "News Desk Editor", "Feature Editor", "Fact-Checker Focus", "Style Editor"],
         index=1,  # Default to Writing Coach
-        help="How should the editors approach your work?"
+        help="This determines how the AI editors will focus their feedback and adopt different editorial perspectives when reviewing your work."
     )
     
     publication_style = st.selectbox(
@@ -178,12 +196,20 @@ with col4:
 
 custom_context = st.text_area(
     "Custom Editor Context (optional)",
-    placeholder="Any specific guidance for the editorial team...",
-    height=80
+    placeholder="Override default editorial approaches with specific guidance: e.g., 'Focus on informal, conversational tone' or 'Prioritize accessibility for general readers' or 'This is satire - evaluate humor effectiveness'...",
+    height=80,
+    help="Your custom instructions will take priority over all default editorial approaches. Use this to specify tone preferences, special requirements, or any other specific guidance for the editorial team."
 )
 
 # Article input section
 st.markdown("## 📄 Step 2: Your Article")
+
+# Word limit notice
+st.markdown("""
+<div class="word-limit-notice">
+<strong>📊 Article Length Guidance:</strong> MECCA works best with articles up to 3,000 words. Longer pieces may be truncated during processing. For optimal results, consider reviewing longer works in sections.
+</div>
+""", unsafe_allow_html=True)
 
 headline = st.text_input(
     "**Headline:**",
@@ -279,13 +305,13 @@ Perplexity Fact-Checker Response:
     st.markdown("## 👥 Individual Editor Responses")
     st.markdown("*Click to expand individual editor feedback*")
     
-    with st.expander("📝 GPT-4 Editor"):
+    with st.expander("📝 GPT-4 Editor (Fact-Checking Lead)"):
         st.markdown(gpt_response)
     
-    with st.expander("📝 Gemini Editor"):
+    with st.expander("📝 Gemini Editor (Structure/Flow Lead)"):
         st.markdown(gemini_response)
     
-    with st.expander("📝 Perplexity Fact-Checker"):
+    with st.expander("📝 Perplexity Fact-Checker (Real-time Verification)"):
         st.markdown(perplexity_response)
 
 elif analyze_button:
