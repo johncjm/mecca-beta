@@ -141,54 +141,65 @@ writer_role = st.selectbox(
 col1, col2 = st.columns(2)
 
 with col1:
-    editorial_role = st.selectbox(
-        "How should the editors approach your work?",
+    st.markdown("**How should the editors approach your work?**")
+    editorial_role = st.radio(
+        "editorial_role_radio",
         ["Copy Editor", "Writing Coach", "News Desk Editor", "Feature Editor", "Fact-Checker Focus", "Style Editor"],
         index=1,  # Default to Writing Coach
-        help="This determines how the AI editors will focus their feedback and adopt different editorial perspectives when reviewing your work."
+        help="This determines how the AI editors will focus their feedback and adopt different editorial perspectives when reviewing your work.",
+        horizontal=True,
+        label_visibility="collapsed"
     )
     
-    publication_style = st.selectbox(
-        "Publication Style",
-        ["House Style", "New York Times", "Wall Street Journal", "Washington Post", "The Guardian", "Associated Press", "Reuters", "The Atlantic", "New Yorker", "Politico", "Other"],
+    st.markdown("**Content Type**")
+    content_type = st.radio(
+        "content_type_radio",
+        ["Standard news article", "Investigation", "Feature", "Essay", "Review", "Other"],
         index=0,
-        help="Edit in the style of which publication?"
-    )
-    
-    content_type = st.selectbox(
-        "Content Type",
-        ["News", "Investigation", "Feature", "Essay", "Review", "Other"],
-        index=0
+        horizontal=True,
+        label_visibility="collapsed"
     )
 
 with col2:
-    category_emphasis = st.selectbox(
-        "Category Emphasis",
+    st.markdown("**Category Emphasis**")
+    category_emphasis = st.radio(
+        "category_emphasis_radio",
         ["Comprehensive", "Fact-checking heavy", "Style focus", "Structure focus"],
         index=0,
-        help="What type of editing focus?"
+        help="What type of editing focus?",
+        horizontal=True,
+        label_visibility="collapsed"
     )
     
-    target_audience = st.selectbox(
-        "Target Audience", 
+    st.markdown("**Target Audience**")
+    target_audience = st.radio(
+        "target_audience_radio",
         ["General readers", "Specialists", "Students", "Other"],
-        index=0
-    )
-    
-    process_stage = st.selectbox(
-        "Process Stage",
-        ["Draft review", "Polish/copy edit", "Fact-check focus"],
-        index=0
+        index=0,
+        horizontal=True,
+        label_visibility="collapsed"
     )
 
 # Additional options
+st.markdown("**Process Stage**")
+process_stage = st.radio(
+    "process_stage_radio",
+    ["Draft review", "Polish/copy edit", "Fact-check focus"],
+    index=0,
+    horizontal=True,
+    label_visibility="collapsed"
+)
+
 col3, col4 = st.columns(2)
 
 with col3:
-    style_guide = st.selectbox(
-        "Style Guide",
+    st.markdown("**Style Guide**")
+    style_guide = st.radio(
+        "style_guide_radio",
         ["AP", "Chicago", "MLA", "APA", "House style", "Other"],
-        index=0
+        index=0,
+        horizontal=True,
+        label_visibility="collapsed"
     )
 
 with col4:
@@ -196,7 +207,7 @@ with col4:
 
 custom_context = st.text_area(
     "Custom Editor Context (optional)",
-    placeholder="Override default editorial approaches with specific guidance: e.g., 'Focus on informal, conversational tone' or 'Prioritize accessibility for general readers' or 'This is satire - evaluate humor effectiveness'...",
+    placeholder='Use this space to emphasize your most important need or to give the AI models the kind of important context your editor might know -- "Fact check all names" or "Identify any \'holes\' that call for more reporting" or "The informal tone is deliberate, as this is for an internal newsletter"',
     height=80,
     help="Your custom instructions will take priority over all default editorial approaches. Use this to specify tone preferences, special requirements, or any other specific guidance for the editorial team."
 )
@@ -252,8 +263,7 @@ if analyze_button and article_text.strip():
             "custom_context": custom_context,
             "headline": headline,
             "writer_role": writer_role,
-            "editorial_role": editorial_role,
-            "publication_style": publication_style
+            "editorial_role": editorial_role
         }
         
         # Map writer role to expected format
