@@ -1,5 +1,5 @@
 # mecca_natural_prompts.py
-# Enhanced version with advanced options support
+# Enhanced version with hybrid overlap + specialization approach
 # Natural language prompt templates for MECCA editorial system
 
 def get_role_context(writer_role):
@@ -9,6 +9,8 @@ def get_role_context(writer_role):
         The writer is a journalism student learning the craft. Provide educational explanations 
         and teaching moments. Explain WHY things need to be changed, not just WHAT needs changing. 
         Use a supportive, instructional tone that helps them understand journalistic principles.
+        
+        IMPORTANT: Always identify 1-2 specific strengths in the writing to encourage the student's development.
         """,
         
         "professional": """
@@ -31,8 +33,17 @@ def get_advanced_context(advanced_options):
     
     context_parts = []
     
+    # CRITICAL CONTEXT OVERRIDE - Custom context gets TOP PRIORITY
+    custom_context = advanced_options.get("custom_context")
+    if custom_context and custom_context.strip():
+        context_parts.append("=" * 50)
+        context_parts.append("🚨 CRITICAL CONTEXT OVERRIDE - TOP PRIORITY:")
+        context_parts.append(f"{custom_context}")
+        context_parts.append("CRITICAL: If custom context provided above, override default role boundaries and editorial approaches to follow these specific instructions.")
+        context_parts.append("=" * 50)
+    
     # Content type context
-    content_type = advanced_options.get("content_type", "News Article")
+    content_type = advanced_options.get("content_type", "News")
     context_parts.append(f"CONTENT TYPE: {content_type}")
     
     if content_type == "Investigation":
@@ -48,7 +59,7 @@ def get_advanced_context(advanced_options):
     audience = advanced_options.get("target_audience", "General readers")
     context_parts.append(f"TARGET AUDIENCE: {audience}")
     
-    if audience == "Subject specialists":
+    if audience == "Specialists":
         context_parts.append("Readers will have domain expertise. Technical accuracy and depth are crucial.")
     elif audience == "Students":
         context_parts.append("Educational clarity and accessible explanations are important.")
@@ -67,8 +78,8 @@ def get_advanced_context(advanced_options):
         context_parts.append("Address both structural and detailed issues appropriate for comprehensive revision.")
     
     # Category focus
-    focus = advanced_options.get("category_focus", "Comprehensive review")
-    if focus != "Comprehensive review":
+    focus = advanced_options.get("category_emphasis", "Comprehensive")
+    if focus != "Comprehensive":
         context_parts.append(f"FOCUS AREA: {focus}")
         
         if focus == "Fact-checking heavy":
@@ -98,15 +109,34 @@ def get_advanced_context(advanced_options):
         context_parts.append(f"TARGET LENGTH: {target_length}")
         context_parts.append("Consider whether the current length serves the content well and suggest adjustments if needed.")
     
-    # Additional context
-    editor_context = advanced_options.get("editor_context")
-    if editor_context:
-        context_parts.append(f"ADDITIONAL CONTEXT: {editor_context}")
+    # Editorial role context
+    editorial_role = advanced_options.get("editorial_role")
+    if editorial_role:
+        context_parts.append(f"EDITORIAL APPROACH: {editorial_role}")
+        
+        if editorial_role == "Writing Coach":
+            context_parts.append("Adopt a mentoring perspective focused on skill development and improvement.")
+        elif editorial_role == "Copy Editor":
+            context_parts.append("Focus on grammar, style, accuracy, and publication readiness.")
+        elif editorial_role == "News Desk Editor":
+            context_parts.append("Apply newsroom standards with focus on speed, accuracy, and reader engagement.")
+        elif editorial_role == "Feature Editor":
+            context_parts.append("Emphasize storytelling, narrative flow, and feature-specific techniques.")
+        elif editorial_role == "Fact-Checker Focus":
+            context_parts.append("Prioritize verification and sourcing above all other concerns.")
+        elif editorial_role == "Style Editor":
+            context_parts.append("Focus primarily on voice, tone, and stylistic consistency.")
+    
+    # Publication style
+    pub_style = advanced_options.get("publication_style")
+    if pub_style and pub_style != "House Style":
+        context_parts.append(f"PUBLICATION STYLE: {pub_style}")
+        context_parts.append(f"Apply the editorial standards and style conventions typical of {pub_style}.")
     
     return "\n".join(context_parts)
 
 def get_editorial_prompt(model_name, article_text, writer_role="professional", advanced_options=None):
-    """Generate model-specific editorial prompts with advanced options"""
+    """Generate model-specific editorial prompts with hybrid overlap + specialization approach"""
     
     role_context = get_role_context(writer_role)
     advanced_context = get_advanced_context(advanced_options)
@@ -125,16 +155,94 @@ Please also evaluate the headline for:
 
 """
     
-    base_prompt = f"""You are acting as a professional editor reviewing this article. 
+    # Universal critical issue flagging (ALL MODELS)
+    universal_critical_section = """
+🚨 UNIVERSAL CRITICAL ISSUE FLAGGING (ALWAYS FLAG REGARDLESS OF YOUR PRIMARY ROLE):
+- Obvious factual errors that could embarrass the publication
+- Major credibility threats or ethical concerns
+- Structural problems that fundamentally undermine the article
+- Legal issues or potential liability concerns
+- Claims that are clearly false or misleading
+
+"""
+    
+    # Model-specific specialization boundaries
+    specialization_sections = {
+        "gpt-4o": """
+YOUR PRIMARY SPECIALIZATION: FACT-CHECKING LEAD
+Focus primarily on verification, sourcing, and accuracy, but always flag critical credibility issues in other areas.
+
+SPECIALIZED RESPONSIBILITIES:
+- Verify factual claims against reliable sources
+- Check proper attribution and sourcing
+- Identify claims needing independent verification
+- Assess credibility of sources mentioned
+- Flag potential legal or ethical issues
+
+SECONDARY OVERSIGHT: Always flag critical issues in structure, style, or other areas that could harm publication credibility.
+""",
+        
+        "gemini": """
+YOUR PRIMARY SPECIALIZATION: STRUCTURE/FLOW LEAD
+Focus primarily on organization, clarity, and reader comprehension, but always flag critical credibility issues in other areas.
+
+SPECIALIZED RESPONSIBILITIES:
+- Assess overall article organization and logical flow
+- Identify unclear or confusing passages
+- Evaluate paragraph transitions and coherence
+- Check that the structure serves the content type
+- Assess reader comprehension and engagement
+
+SECONDARY OVERSIGHT: Always flag critical issues in facts, style, or other areas that could harm publication credibility.
+""",
+        
+        "perplexity": """
+YOUR PRIMARY SPECIALIZATION: REAL-TIME VERIFICATION
+Use your web search capabilities for current fact-checking and source verification, but always flag critical credibility issues in other areas.
+
+SPECIALIZED RESPONSIBILITIES:
+- Verify current information using web search
+- Check recent events, current officeholders, latest statistics
+- Validate proper names, titles, and recent developments
+- Cross-reference claims with current reliable sources
+- Flag outdated information
+
+SECONDARY OVERSIGHT: Always flag critical issues in structure, style, or other areas that could harm publication credibility.
+""",
+        
+        "claude": """
+YOUR PRIMARY SPECIALIZATION: TONE/STYLE LEAD
+Focus primarily on voice, audience appropriateness, and engagement, but always flag critical credibility issues in other areas.
+
+SPECIALIZED RESPONSIBILITIES:
+- Assess tone appropriateness for target audience
+- Evaluate voice consistency and style
+- Check language accessibility and clarity
+- Assess engagement and readability
+- Identify stylistic inconsistencies
+
+SECONDARY OVERSIGHT: Always flag critical issues in facts, structure, or other areas that could harm publication credibility.
+"""
+    }
+    
+    base_prompt = f"""You are acting as a professional editor reviewing this article using MECCA's hybrid specialization approach.
 
 {role_context}
 
 {advanced_context}
 
+{universal_critical_section}
+
+{specialization_sections.get(model_name, specialization_sections["claude"])}
+
 {headline_section}ARTICLE TO REVIEW:
 {article_text}
 
-IMPORTANT: The article text above has been numbered by paragraphs for easy reference. When providing feedback, please reference specific paragraphs (e.g., "Paragraph 3:" or "In Paragraph 1:") to help the writer locate issues quickly.
+FEEDBACK REQUIREMENTS:
+1. ALWAYS reference specific paragraphs when providing feedback (e.g., "Paragraph 3:" or "In Paragraph 1:")
+2. Provide SPECIFIC, ACTIONABLE suggestions rather than vague observations
+3. Include concrete examples of how to improve problematic passages
+4. For factual claims, be explicit about verification status
 
 FACT-CHECKING PRIORITY:
 For each factual claim, decide whether to verify or flag:
@@ -163,42 +271,26 @@ SEVERITY ASSESSMENT:
 
 Provide specific, actionable feedback that helps the writer improve their work."""
 
-    # Model-specific customizations
+    # Model-specific final instructions based on specialization
     if model_name == "perplexity":
         return base_prompt + """
 
-SPECIAL FOCUS FOR YOUR REVIEW:
-As our fact-checking specialist, prioritize verification of factual claims using current, reliable sources. 
-Use your web search capabilities to verify:
-- Current officeholders and their correct titles
-- Recent events and their accurate details
-- Proper names and their correct spelling
-- Statistics and their sources
-
-Be especially thorough with fact-checking - this is your primary strength in our editorial team."""
+REMEMBER: While you are the real-time verification specialist, you must still flag any critical issues you notice in structure, style, or other areas. Your web search capabilities make you especially valuable for current fact-checking."""
 
     elif model_name == "gpt-4o":
         return base_prompt + """
 
-SPECIAL FOCUS FOR YOUR REVIEW:
-Provide comprehensive editorial feedback with strong attention to journalistic ethics and standards. 
-Focus on sourcing requirements, attribution standards, and overall editorial quality. Consider how 
-this piece would be received by readers and what questions they might have."""
+REMEMBER: While you are the fact-checking lead, you must still flag any critical issues you notice in structure, style, or other areas. Your strength in comprehensive analysis makes you valuable for overall editorial quality."""
 
     elif model_name == "gemini":
         return base_prompt + """
 
-SPECIAL FOCUS FOR YOUR REVIEW:
-Provide systematic categorization of issues with clear severity assessment. Focus on organizing 
-your feedback in a structured way that helps prioritize fixes. Consider the overall coherence 
-and logical flow of the article."""
+REMEMBER: While you are the structure/flow lead, you must still flag any critical issues you notice in facts, style, or other areas. Your systematic approach makes you valuable for organizing feedback clearly."""
 
     elif model_name == "claude":
         return base_prompt + """
 
-SPECIAL FOCUS FOR YOUR REVIEW:
-Provide educational explanations for your suggestions, helping the writer understand the reasoning 
-behind each recommendation. Focus on teaching moments and building journalistic skills."""
+REMEMBER: While you are the tone/style lead, you must still flag any critical issues you notice in facts, structure, or other areas. Your nuanced understanding makes you valuable for audience-appropriate communication."""
 
     else:
         return base_prompt
@@ -207,33 +299,39 @@ def get_eic_synthesis_prompt(gpt_response, gemini_response, claude_response, per
     """Generate prompt for Editor-in-Chief synthesis with advanced options"""
     
     role_guidance = {
-        "student": "Focus on learning opportunities and educational explanations.",
-        "professional": "Focus on efficiency and industry standards.",
+        "student": "Focus on learning opportunities and educational explanations. Include encouragement about what the student is doing well.",
+        "professional": "Focus on efficiency and industry standards with direct, actionable priorities.",
         "other": "Balance detail with clarity for a general audience."
     }
     
     # Get context from advanced options
     advanced_context = get_advanced_context(advanced_options) if advanced_options else ""
     
-    return f"""You are the Editor-in-Chief synthesizing feedback from our editorial team. {role_guidance.get(writer_role, role_guidance["other"])}
+    return f"""You are the Editor-in-Chief synthesizing feedback from our specialized editorial team using the "embarrassment test" - prioritizing issues that would most embarrass the publication if published. {role_guidance.get(writer_role, role_guidance["other"])}
 
 {advanced_context}
 
+EDITORIAL TEAM COMPOSITION:
+- GPT-4: Fact-Checking Lead (primary: verification/sourcing, secondary: critical issue flagging)
+- Gemini: Structure/Flow Lead (primary: organization/clarity, secondary: critical issue flagging)  
+- Perplexity: Real-time Verification (primary: current fact-checking, secondary: critical issue flagging)
+- Your role: Synthesize using "embarrassment test" prioritization
+
 EDITORIAL TEAM RESPONSES:
 
-GPT-4 EDITOR FEEDBACK:
+GPT-4 FACT-CHECKING LEAD FEEDBACK:
 {gpt_response}
 
-GEMINI EDITOR FEEDBACK:  
+GEMINI STRUCTURE/FLOW LEAD FEEDBACK:  
 {gemini_response}
 
-CLAUDE EDITOR FEEDBACK:
+CLAUDE TONE/STYLE LEAD FEEDBACK:
 {claude_response}
 
-PERPLEXITY FACT-CHECKER FEEDBACK:
+PERPLEXITY REAL-TIME VERIFICATION FEEDBACK:
 {perplexity_response}
 
-Your job is to synthesize these four perspectives into actionable editorial guidance:
+Your synthesis should:
 
 EDITORIAL SUMMARY:
 Provide a 1-2 paragraph assessment of the article's overall quality and the team's consensus on major issues.
@@ -245,17 +343,24 @@ Using the "embarrassment test" (what would embarrass us most if published as-is)
 3. [Third priority with paragraph reference if applicable]
 etc.
 
+SYNTHESIS APPROACH:
+- Don't just repeat what individual editors said
+- Provide genuine editorial judgment about priorities
+- Resolve conflicts between different editors' feedback
+- Focus on actionable next steps
+- Consider the specialized roles each editor played
+
 IMPORTANT DISCLAIMER:
 Always end with: "This AI-generated feedback is advisory only. The writer maintains full responsibility for fact-checking, editorial decisions, and final content. All suggestions, especially those related to factual claims, must be independently verified."
 
-Focus on synthesis and meta-analysis - don't just repeat what the individual editors said, but provide genuine editorial judgment about priorities and actionable next steps."""
+Focus on synthesis and meta-analysis that provides genuine editorial leadership."""
 
 def get_model_display_name(model_key):
     """Convert model keys to display names"""
     display_names = {
-        "gpt-4o": "GPT-4O Editor",
-        "gemini": "Gemini Editor", 
-        "claude": "Claude Editor",
-        "perplexity": "Perplexity Fact-Checker"
+        "gpt-4o": "GPT-4 Editor (Fact-Checking Lead)",
+        "gemini": "Gemini Editor (Structure/Flow Lead)", 
+        "claude": "Claude Editor (Tone/Style Lead)",
+        "perplexity": "Perplexity Fact-Checker (Real-time Verification)"
     }
     return display_names.get(model_key, model_key)
