@@ -43,7 +43,7 @@ def get_advanced_context(advanced_options):
         context_parts.append("=" * 50)
     
     # Content type context
-    content_type = advanced_options.get("content_type", "News")
+    content_type = advanced_options.get("content_type", "Standard news article")
     context_parts.append(f"CONTENT TYPE: {content_type}")
     
     if content_type == "Investigation":
@@ -54,6 +54,8 @@ def get_advanced_context(advanced_options):
         context_parts.append("Evaluate argument structure, evidence quality, and persuasive writing techniques.")
     elif content_type == "Review":
         context_parts.append("Assess balance, expertise demonstration, and fair evaluation criteria.")
+    elif content_type == "Standard news article":
+        context_parts.append("Apply standard news writing principles: lead, supporting facts, balanced reporting, and clear attribution.")
     
     # Target audience context
     audience = advanced_options.get("target_audience", "General readers")
@@ -126,12 +128,6 @@ def get_advanced_context(advanced_options):
             context_parts.append("Prioritize verification and sourcing above all other concerns.")
         elif editorial_role == "Style Editor":
             context_parts.append("Focus primarily on voice, tone, and stylistic consistency.")
-    
-    # Publication style
-    pub_style = advanced_options.get("publication_style")
-    if pub_style and pub_style != "House Style":
-        context_parts.append(f"PUBLICATION STYLE: {pub_style}")
-        context_parts.append(f"Apply the editorial standards and style conventions typical of {pub_style}.")
     
     return "\n".join(context_parts)
 
