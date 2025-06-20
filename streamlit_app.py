@@ -1,7 +1,7 @@
 import streamlit as st
 import os
 from mecca_dialogue_prototype_calls import call_openai, call_anthropic, call_google, call_perplexity, enhanced_dialogue_handler
-from mecca_dialogue_prototype_prompts import get_editorial_prompt, get_eic_synthesis_prompt
+from mecca_dialogue_prototype_prompts import get_editorial_prompt, get_eic_synthesis_prompt_with_toggle
 
 # Configure page
 st.set_page_config(
@@ -29,8 +29,11 @@ if 'editor_responses' not in st.session_state:
 # Store validation history
 if 'validation_history' not in st.session_state:
     st.session_state.validation_history = []
+# EiC view mode for toggle
+if 'eic_view_mode' not in st.session_state:
+    st.session_state.eic_view_mode = 'full'
 
-# Enhanced CSS for better styling and layout
+# Enhanced CSS for better styling and layout + Toggle Feature
 st.markdown("""
 <style>
     .main-header {
@@ -160,8 +163,193 @@ st.markdown("""
     .stTabs [data-baseweb="tab-panel"] {
         padding-top: 1rem;
     }
+    
+    /* EiC Toggle Styles */
+    .eic-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid #e9ecef;
+    }
+    
+    .eic-title {
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: #333;
+        margin: 0;
+    }
+    
+    .eic-toggle {
+        display: flex;
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        padding: 4px;
+        border: 1px solid #dee2e6;
+    }
+    
+    .eic-toggle-btn {
+        padding: 8px 16px;
+        border: none;
+        background: transparent;
+        border-radius: 6px;
+        font-size: 0.9rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        color: #6c757d;
+    }
+    
+    .eic-toggle-btn.active {
+        background-color: #ffffff;
+        color: #1f77b4;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .eic-toggle-btn:hover:not(.active) {
+        color: #495057;
+        background-color: #e9ecef;
+    }
+    
+    /* Content visibility classes */
+    .eic-full-content {
+        display: block;
+    }
+    
+    .eic-condensed-content {
+        display: none;
+    }
+    
+    .view-quick-fixes .eic-full-content {
+        display: none;
+    }
+    
+    .view-quick-fixes .eic-condensed-content {
+        display: block;
+    }
+    
+    /* Quick fixes styling */
+    .quick-fixes-summary {
+        background-color: #fff3cd;
+        padding: 1.5rem;
+        border-radius: 10px;
+        border-left: 4px solid #ffc107;
+        margin-bottom: 1rem;
+    }
+    
+    .error-count-overview {
+        background-color: #e7f3ff;
+        padding: 1rem;
+        border-radius: 6px;
+        margin-bottom: 1rem;
+        font-size: 0.9rem;
+    }
+    
+    .quick-fix-item {
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #e9ecef;
+    }
+    
+    .quick-fix-item:last-child {
+        border-bottom: none;
+    }
+    
+    .fix-severity {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: bold;
+        margin-right: 8px;
+    }
+    
+    .severity-critical {
+        background-color: #f8d7da;
+        color: #721c24;
+    }
+    
+    .severity-high {
+        background-color: #fff3cd;
+        color: #856404;
+    }
+    
+    .severity-medium {
+        background-color: #d1ecf1;
+        color: #0c5460;
+    }
 </style>
+
+<script>
+function toggleEiCView(mode) {
+    const container = document.querySelector('.eic-container');
+    const buttons = document.querySelectorAll('.eic-toggle-btn');
+    
+    // Remove active class from all buttons
+    buttons.forEach(btn => btn.classList.remove('active'));
+    
+    // Add active class to clicked button
+    const targetBtn = document.querySelector(`[data-mode="${mode}"]`);
+    if (targetBtn) {
+        targetBtn.classList.add('active');
+    }
+    
+    // Toggle container class
+    if (mode === 'quick') {
+        container.classList.add('view-quick-fixes');
+    } else {
+        container.classList.remove('view-quick-fixes');
+    }
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Set default view to full analysis
+    setTimeout(function() {
+        const fullBtn = document.querySelector('[data-mode="full"]');
+        if (fullBtn) {
+            fullBtn.classList.add('active');
+        }
+    }, 100);
+});
+</script>
 """, unsafe_allow_html=True)
+
+def parse_eic_content(eic_response):
+    """Parse EiC response to separate quick fixes from full analysis"""
+    
+    # Look for our structured markers
+    quick_fixes_start = eic_response.find("<!-- QUICK_FIXES_START -->")
+    quick_fixes_end = eic_response.find("<!-- QUICK_FIXES_END -->")
+    full_analysis_start = eic_response.find("<!-- FULL_ANALYSIS_START -->")
+    full_analysis_end = eic_response.find("<!-- FULL_ANALYSIS_END -->")
+    
+    if quick_fixes_start != -1 and quick_fixes_end != -1:
+        quick_fixes_content = eic_response[quick_fixes_start+len("<!-- QUICK_FIXES_START -->"):quick_fixes_end].strip()
+    else:
+        # Fallback: extract Quick Fixes section manually
+        lines = eic_response.split('\n')
+        quick_fixes_lines = []
+        in_quick_fixes = False
+        
+        for line in lines:
+            if '🎯 QUICK FIXES NEEDED' in line:
+                in_quick_fixes = True
+                quick_fixes_lines.append(line)
+            elif in_quick_fixes and (line.startswith('EDITORIAL SUMMARY') or line.startswith('PRIORITY ACTION LIST')):
+                break
+            elif in_quick_fixes:
+                quick_fixes_lines.append(line)
+        
+        quick_fixes_content = '\n'.join(quick_fixes_lines)
+    
+    if full_analysis_start != -1 and full_analysis_end != -1:
+        full_analysis_content = eic_response[full_analysis_start+len("<!-- FULL_ANALYSIS_START -->"):full_analysis_end].strip()
+    else:
+        # Fallback: use entire response
+        full_analysis_content = eic_response
+    
+    return quick_fixes_content, full_analysis_content
 
 # Main header
 st.markdown('<div class="main-header">📝 MECCA Interactive Prototype</div>', unsafe_allow_html=True)
@@ -382,8 +570,8 @@ Perplexity Fact-Checker Response:
 {perplexity_response}
         """
         
-        # Call Claude as Editor-in-Chief with enhanced synthesis
-        claude_eic_prompt = get_eic_synthesis_prompt(gpt_response, gemini_response, "", perplexity_response, mapped_role, context)
+        # Call Claude as Editor-in-Chief with enhanced synthesis + toggle support
+        claude_eic_prompt = get_eic_synthesis_prompt_with_toggle(gpt_response, gemini_response, "", perplexity_response, mapped_role, context)
         claude_response = call_anthropic(claude_eic_prompt, combined_analysis, anthropic_key) if anthropic_key else "Anthropic API key not configured"
         
         # Store EiC response for dialogue
@@ -414,13 +602,43 @@ if st.session_state.has_analysis:
     ])
     
     with tab1:
-        st.markdown("## Editor-in-Chief Summary")
+        # EiC Header with Toggle
+        st.markdown("""
+        <div class="eic-header">
+            <h2 class="eic-title">📋 Editor-in-Chief Summary</h2>
+            <div class="eic-toggle">
+                <button class="eic-toggle-btn" data-mode="full" onclick="toggleEiCView('full')">
+                    📚 Full Analysis
+                </button>
+                <button class="eic-toggle-btn" data-mode="quick" onclick="toggleEiCView('quick')">
+                    📝 Quick Fixes
+                </button>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
         st.markdown("*Synthesis of all editorial feedback using the 'embarrassment test' for prioritization*")
         
-        # EiC summary in a clean container
-        st.markdown('<div class="eic-summary">', unsafe_allow_html=True)
-        st.markdown(st.session_state.eic_summary)
+        # EiC content container with toggle classes
+        st.markdown('<div class="eic-container">', unsafe_allow_html=True)
+        
+        # Parse the EiC response to separate quick fixes from full analysis
+        eic_content = st.session_state.eic_summary
+        quick_fixes_content, full_analysis_content = parse_eic_content(eic_content)
+        
+        # Quick Fixes Content (hidden by default)
+        st.markdown('<div class="eic-condensed-content">', unsafe_allow_html=True)
+        st.markdown('<div class="quick-fixes-summary">', unsafe_allow_html=True)
+        st.markdown(quick_fixes_content)
         st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Full Analysis Content (visible by default)  
+        st.markdown('<div class="eic-full-content">', unsafe_allow_html=True)
+        st.markdown(full_analysis_content)
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        st.markdown('</div>', unsafe_allow_html=True)  # Close eic-container
         
         # Navigation hints
         st.markdown("---")
