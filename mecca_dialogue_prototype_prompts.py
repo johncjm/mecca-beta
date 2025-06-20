@@ -1,5 +1,5 @@
 # mecca_dialogue_prototype_prompts.py
-# Enhanced version with organized, practical feedback requirements
+# Enhanced version with organized, practical feedback requirements + Toggle Support
 # Natural language prompt templates for MECCA interactive editorial system
 
 def get_role_context(writer_role):
@@ -239,16 +239,23 @@ FOCUS: Be the meticulous copy editor who catches every mechanical error.
         "perplexity": """
 YOUR ENHANCED SPECIALIZATION: FACT-CHECKING ONLY
 
-SECTION 3 - FACT VERIFICATION:
-CRITICAL: Do NOT comment on style, structure, grammar, or organization.
-Your ONLY job is verification of factual claims.
+🚨 CRITICAL RESTRICTION: Do NOT comment on style, structure, grammar, organization, headlines, or writing quality.
+Your ONLY job is verification of factual claims. Stay in your lane.
 
+SECTION 3 - FACT VERIFICATION ONLY:
 MANDATORY FACT-CHECKING SCOPE:
 - Names, titles, and current positions of all people mentioned
 - Dates, locations, and numerical claims
 - Recent events and their participants
 - Statistics and their sources
 - Historical references and their accuracy
+
+🚫 ABSOLUTELY FORBIDDEN:
+- Commenting on paragraph structure
+- Suggesting headline changes
+- Advising on writing style or tone
+- Recommending organizational improvements
+- Giving editorial advice beyond fact verification
 
 WEB SEARCH REQUIREMENTS:
 - Use current, authoritative sources only (.gov, .edu, major news)
@@ -262,7 +269,7 @@ VERIFICATION: ✓/⚠️/❌ [status]
 SOURCE: [exact URL and relevant quote]
 NOTE: [any important context or limitations]"
 
-FOCUS: Pure fact verification with rock-solid sourcing. Ignore everything else.
+FOCUS: Pure fact verification with rock-solid sourcing. IGNORE EVERYTHING ELSE.
 """,
         
         "claude": """
@@ -317,8 +324,8 @@ Remember: Provide specific, practical feedback that makes editing efficient and 
 
     return base_prompt
 
-def get_eic_synthesis_prompt(gpt_response, gemini_response, claude_response, perplexity_response, writer_role="professional", advanced_options=None):
-    """Enhanced EiC prompt with practical summary requirements"""
+def get_eic_synthesis_prompt_with_toggle(gpt_response, gemini_response, claude_response, perplexity_response, writer_role="professional", advanced_options=None):
+    """Enhanced EiC prompt with practical summary requirements + Toggle Support"""
     
     role_guidance = {
         "student": "Focus on learning opportunities and educational explanations. Include encouragement about what the student is doing well.",
@@ -352,25 +359,43 @@ CLAUDE TONE/STYLE:
 PERPLEXITY FACT-CHECKING:
 {perplexity_response}
 
-ENHANCED SYNTHESIS REQUIREMENTS:
+ENHANCED SYNTHESIS REQUIREMENTS WITH TOGGLE SUPPORT:
 
-🎯 QUICK FIXES NEEDED (Start with this):
-List 5-10 immediate, actionable corrections with paragraph numbers:
-- Format: "Para X: Fix Y" or "Para Z: Verify claim about W"  
+CRITICAL: Structure your response using these EXACT HTML comments for the toggle feature:
+
+<!-- QUICK_FIXES_START -->
+🎯 QUICK FIXES NEEDED:
+[Provide 8-12 immediate, actionable corrections with paragraph numbers]
+- Format: "Para X: [CRITICAL/GRAMMAR/FACT/STYLE] Fix Y" 
+- Include severity markers and error types
 - Prioritize by embarrassment potential and ease of fixing
-- Include specific typos, wrong names, obvious errors
+- Examples: 
+  • "Para 1: [CRITICAL] Verify Mario Cuomo status (deceased 2015)"
+  • "Para 3: [GRAMMAR] 'jjoined' → 'joined'"
+  • "Para 7: [FACT] Confirm Mamdani's title (Assembly vs. Senate)"
 
+ERROR OVERVIEW:
+[Provide count summary like: "📊 5 Factual issues, 12 Grammar corrections, 3 Style improvements"]
+
+CRITICAL VERIFICATION FLAGS:
+[List only the most urgent fact-checking needs with brief context]
+- Format: "⚠️ VERIFY: [claim] - [why it matters/potential embarrassment]"
+- Focus on names, titles, dates, statistics that could humiliate if wrong
+- Include brief note about why verification is critical
+<!-- QUICK_FIXES_END -->
+
+<!-- FULL_ANALYSIS_START -->
 EDITORIAL SUMMARY:
-Provide 1-2 paragraph assessment of overall quality and consensus on major issues.
+[Provide 1-2 paragraph assessment of overall quality and consensus on major issues]
 
-PRIORITY ACTION LIST:
+DETAILED PRIORITY ACTION LIST:
 Using "embarrassment test" prioritization:
 1. CRITICAL - Issues that could humiliate publication
 2. HIGH PRIORITY - Credibility and quality concerns  
 3. MEDIUM PRIORITY - Style and clarity improvements
 
-VERIFICATION REQUIREMENTS:
-List specific claims needing manual verification with guidance on sources to check.
+COMPREHENSIVE VERIFICATION REQUIREMENTS:
+[List specific claims needing manual verification with detailed guidance on sources to check]
 
 SYNTHESIS NOTES:
 - Resolve any conflicts between specialist feedback
@@ -378,10 +403,28 @@ SYNTHESIS NOTES:
 - Note any specialist blind spots or missed issues
 - Focus on actionable next steps with clear priorities
 
+EDUCATIONAL CONTEXT:
+[Include pedagogical explanations, AI performance transparency, and learning opportunities]
+[Show exactly what each specialist found vs. missed for transparency]
+[Use specialist failures as teaching moments about AI limitations]
+<!-- FULL_ANALYSIS_END -->
+
 IMPORTANT DISCLAIMER:
 Always end with: "This AI-generated feedback is advisory only. The writer maintains full responsibility for fact-checking, editorial decisions, and final content. All suggestions, especially those related to factual claims, must be independently verified."
 
-Focus on making the writer's revision process efficient and effective."""
+CRITICAL FORMATTING REQUIREMENTS:
+1. Use the exact HTML comment markers shown above
+2. Make Quick Fixes section scannable with clear bullet points
+3. Include severity/type markers for each fix
+4. Provide error count overview for quick assessment
+5. Ensure Full Analysis contains all educational and transparency content
+
+Focus on making the writer's revision process efficient and effective with toggle support."""
+
+# Keep the original function for backwards compatibility
+def get_eic_synthesis_prompt(gpt_response, gemini_response, claude_response, perplexity_response, writer_role="professional", advanced_options=None):
+    """Original EiC synthesis prompt - maintained for compatibility"""
+    return get_eic_synthesis_prompt_with_toggle(gpt_response, gemini_response, claude_response, perplexity_response, writer_role, advanced_options)
 
 def get_enhanced_dialogue_system_prompt(original_article, eic_summary, context, individual_responses):
     """Generate enhanced system prompt for EiC dialogue with mandatory transparency about specialist responses"""
