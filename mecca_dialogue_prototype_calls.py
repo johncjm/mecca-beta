@@ -332,19 +332,39 @@ class MECCAResponseValidator:
         
         return recommendations
 
-def enhanced_dialogue_handler_with_validation(user_question, st_session_state, anthropic_key):
-    """Enhanced dialogue handler with validation system"""
+def enhanced_dialogue_handler_v2(user_question, st_session_state, anthropic_key):
+    """
+    Enhanced dialogue handler V2 with smart routing and maximum transparency
+    """
     
-    # Import the enhanced dialogue prompt function
-    from mecca_dialogue_prototype_prompts import get_enhanced_dialogue_system_prompt
+    # Import the enhanced dialogue prompt functions
+    from mecca_dialogue_prototype_prompts import get_enhanced_dialogue_system_prompt_v2, get_enhanced_dialogue_system_prompt
     
-    # Prepare enhanced dialogue messages with individual responses
-    system_prompt = get_enhanced_dialogue_system_prompt(
-        st_session_state.original_article, 
-        st_session_state.eic_summary, 
-        st_session_state.context,
-        st_session_state.editor_responses
-    )
+    # Determine if this is a specialist performance question
+    specialist_keywords = [
+        "specialist", "fact-checker", "editor", "caught", "missed", "found", 
+        "team", "ai", "reliable", "accurate", "verification", "performance",
+        "which models", "did your", "how well", "how did", "what did"
+    ]
+    
+    is_specialist_question = any(keyword.lower() in user_question.lower() for keyword in specialist_keywords)
+    
+    if is_specialist_question:
+        # Use maximum transparency prompt for specialist performance questions
+        system_prompt = get_enhanced_dialogue_system_prompt_v2(
+            st_session_state.original_article, 
+            st_session_state.eic_summary, 
+            st_session_state.context,
+            st_session_state.editor_responses
+        )
+    else:
+        # Use standard dialogue prompt for editorial questions
+        system_prompt = get_enhanced_dialogue_system_prompt(
+            st_session_state.original_article, 
+            st_session_state.eic_summary, 
+            st_session_state.context,
+            st_session_state.editor_responses
+        )
     
     # Build conversation history
     messages = [{"role": "user", "content": system_prompt}]
@@ -360,8 +380,8 @@ def enhanced_dialogue_handler_with_validation(user_question, st_session_state, a
     # Get response from Claude
     eic_answer = call_anthropic_dialogue(messages, anthropic_key)
     
-    # VALIDATION STEP
-    if st_session_state.editor_responses:
+    # VALIDATION STEP (for specialist performance questions)
+    if is_specialist_question and st_session_state.editor_responses:
         validator = MECCAResponseValidator(st_session_state.editor_responses)
         validation_result = validator.validate_claude_response(eic_answer)
         
@@ -372,7 +392,8 @@ def enhanced_dialogue_handler_with_validation(user_question, st_session_state, a
         st_session_state.validation_history.append({
             'question': user_question,
             'answer': eic_answer,
-            'validation': validation_result
+            'validation': validation_result,
+            'specialist_question': True
         })
         
         # Log validation results for debugging
@@ -385,18 +406,10 @@ def enhanced_dialogue_handler_with_validation(user_question, st_session_state, a
             if st.secrets.get("MECCA_DEBUG_MODE", False):
                 debug_info = f"\n\n[DEBUG - Validation Issues: {len(validation_result['flags'])} flags]"
                 eic_answer += debug_info
-        
-        return eic_answer, validation_result
-    else:
-        # No specialist responses available for validation
-        return eic_answer, None
-
-# Wrapper function for the main app to use
-def enhanced_dialogue_handler(user_question, st_session_state, anthropic_key):
-    """Production wrapper that returns just the answer"""
-    result = enhanced_dialogue_handler_with_validation(user_question, st_session_state, anthropic_key)
     
-    if isinstance(result, tuple):
-        return result[0]  # Return just the answer
-    else:
-        return result
+    return eic_answer
+
+# Wrapper function for backwards compatibility
+def enhanced_dialogue_handler(user_question, st_session_state, anthropic_key):
+    """Production wrapper that uses V2 enhanced handler"""
+    return enhanced_dialogue_handler_v2(user_question, st_session_state, anthropic_key)
