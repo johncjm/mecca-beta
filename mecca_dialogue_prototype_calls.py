@@ -161,4 +161,255 @@ class MECCAResponseValidator:
             if len(quote) > 10:  # Ignore short quotes like "yes" or "no"
                 # Check if this quote actually appears in any specialist response
                 found_in_specialist = False
-                closest_match
+                closest_match = None
+                
+                for specialist, response in self.specialist_responses.items():
+                    if response and quote.lower() in response.lower():
+                        found_in_specialist = True
+                        break
+                    
+                    # Check for close matches (paraphrasing detection)
+                    if response:
+                        similarity = difflib.SequenceMatcher(None, quote.lower(), response.lower()).ratio()
+                        if similarity > 0.7:  # Likely paraphrasing
+                            closest_match = (specialist, similarity)
+                
+                if not found_in_specialist:
+                    if closest_match:
+                        quote_issues.append({
+                            'type': 'likely_paraphrase',
+                            'quote': quote,
+                            'specialist': closest_match[0],
+                            'similarity': closest_match[1]
+                        })
+                        self.validation_flags.append(f"Possible paraphrase detected: '{quote[:50]}...'")
+                    else:
+                        quote_issues.append({
+                            'type': 'fabricated_quote',
+                            'quote': quote
+                        })
+                        self.validation_flags.append(f"Fabricated quote detected: '{quote[:50]}...'")
+        
+        return {
+            'total_quotes': len([q for q in quotes if len(q) > 10]),
+            'issues': quote_issues,
+            'accuracy_score': 1.0 - (len(quote_issues) / max(len([q for q in quotes if len(q) > 10]), 1))
+        }
+    
+    def _check_forbidden_behaviors(self, claude_response: str) -> List[str]:
+        """Check for forbidden behaviors in Claude's response"""
+        violations = []
+        
+        # Check for performance inflation language
+        inflation_phrases = [
+            "all specialists caught",
+            "my team successfully identified", 
+            "properly verified",
+            "comprehensive analysis revealed"
+        ]
+        
+        for phrase in inflation_phrases:
+            if phrase.lower() in claude_response.lower():
+                violations.append(f"Performance inflation detected: '{phrase}'")
+                self.validation_flags.append(f"FORBIDDEN: Performance inflation - '{phrase}'")
+        
+        # Check for selective quoting (mentioning specialist without showing their actual words)
+        specialist_mentions = re.findall(r'my (gpt-4|gemini|perplexity|fact-checker|copy editor)', 
+                                       claude_response.lower())
+        
+        for mention in specialist_mentions:
+            # Look for actual quotes following the mention
+            mention_index = claude_response.lower().find(mention)
+            following_text = claude_response[mention_index:mention_index+200]
+            
+            if '"' not in following_text and "said:" not in following_text.lower():
+                violations.append(f"Referenced {mention} without providing exact quote")
+                self.validation_flags.append(f"FORBIDDEN: Referenced {mention} without quote")
+        
+        return violations
+    
+    def _check_transparency(self, claude_response: str) -> float:
+        """Check how well Claude demonstrates transparency about AI limitations"""
+        transparency_indicators = 0
+        total_possible = 5
+        
+        # Check for acknowledgment of AI limitations
+        limitation_phrases = [
+            "ai limitations", "cannot rely solely", "demonstrates why", 
+            "this shows", "missed", "failed to", "incorrectly"
+        ]
+        
+        for phrase in limitation_phrases:
+            if phrase.lower() in claude_response.lower():
+                transparency_indicators += 1
+                break
+        
+        # Check for educational framing of failures
+        educational_phrases = [
+            "teaching moment", "demonstrates", "shows why", "example of"
+        ]
+        
+        for phrase in educational_phrases:
+            if phrase.lower() in claude_response.lower():
+                transparency_indicators += 1
+                break
+        
+        # Check for honest assessment language
+        honest_phrases = [
+            "actually", "let me be honest", "completely missed", "failed to catch"
+        ]
+        
+        for phrase in honest_phrases:
+            if phrase.lower() in claude_response.lower():
+                transparency_indicators += 1
+                break
+        
+        # Check for proper specialist error acknowledgment
+        if any(specialist_name in claude_response.lower() for specialist_name in ['gpt', 'gemini', 'perplexity']):
+            if any(error_word in claude_response.lower() for error_word in ['missed', 'wrong', 'incorrect', 'failed']):
+                transparency_indicators += 1
+        
+        # Check for "Not an Oracle" messaging
+        oracle_phrases = [
+            "not an oracle", "human verification", "double-check", "independently verify"
+        ]
+        
+        for phrase in oracle_phrases:
+            if phrase.lower() in claude_response.lower():
+                transparency_indicators += 1
+                break
+        
+        return transparency_indicators / total_possible
+    
+    def _check_educational_use_of_failures(self, claude_response: str) -> Dict:
+        """Check if Claude is using AI failures as educational opportunities"""
+        educational_elements = []
+        
+        # Look for specific educational patterns
+        if "this demonstrates" in claude_response.lower():
+            educational_elements.append("Uses demonstrative teaching")
+        
+        if any(word in claude_response.lower() for word in ["why", "because", "shows that"]):
+            educational_elements.append("Provides explanatory reasoning")
+        
+        if "human oversight" in claude_response.lower() or "verification" in claude_response.lower():
+            educational_elements.append("Emphasizes human verification importance")
+        
+        # Check for specific error analysis
+        error_analysis_phrases = [
+            "missed this", "failed to catch", "incorrectly stated", "should have"
+        ]
+        
+        for phrase in error_analysis_phrases:
+            if phrase.lower() in claude_response.lower():
+                educational_elements.append("Analyzes specific errors")
+                break
+        
+        return {
+            'educational_elements': educational_elements,
+            'educational_score': len(educational_elements) / 4  # Max 4 elements
+        }
+    
+    def _verify_performance_claim(self, claim: str, claude_response: str) -> bool:
+        """Verify if a performance claim made by Claude is actually supported by specialist responses"""
+        # Conservative approach - flag all performance claims for review
+        return False
+    
+    def _generate_recommendations(self) -> List[str]:
+        """Generate specific recommendations based on validation results"""
+        recommendations = []
+        
+        if any("fabricated_quote" in str(flag) for flag in self.validation_flags):
+            recommendations.append("CRITICAL: Stop fabricating quotes. Only use exact text from specialist responses.")
+        
+        if any("paraphrase" in str(flag) for flag in self.validation_flags):
+            recommendations.append("Use exact quotes instead of paraphrasing. Students need to see actual AI output.")
+        
+        if len(self.validation_flags) > 3:
+            recommendations.append("Major transparency issues detected. Review prompt compliance requirements.")
+        
+        recommendations.append("Remember: Your role is educational transparency, not AI performance advocacy.")
+        
+        return recommendations
+
+def enhanced_dialogue_handler_v2(user_question, st_session_state, anthropic_key):
+    """
+    Enhanced dialogue handler V2 with smart routing and maximum transparency
+    """
+    
+    # Import the enhanced dialogue prompt functions
+    from mecca_dialogue_prototype_prompts import get_enhanced_dialogue_system_prompt_v2, get_enhanced_dialogue_system_prompt
+    
+    # Determine if this is a specialist performance question
+    specialist_keywords = [
+        "specialist", "fact-checker", "editor", "caught", "missed", "found", 
+        "team", "ai", "reliable", "accurate", "verification", "performance",
+        "which models", "did your", "how well", "how did", "what did"
+    ]
+    
+    is_specialist_question = any(keyword.lower() in user_question.lower() for keyword in specialist_keywords)
+    
+    if is_specialist_question:
+        # Use maximum transparency prompt for specialist performance questions
+        system_prompt = get_enhanced_dialogue_system_prompt_v2(
+            st_session_state.original_article, 
+            st_session_state.eic_summary, 
+            st_session_state.context,
+            st_session_state.editor_responses
+        )
+    else:
+        # Use standard dialogue prompt for editorial questions
+        system_prompt = get_enhanced_dialogue_system_prompt(
+            st_session_state.original_article, 
+            st_session_state.eic_summary, 
+            st_session_state.context,
+            st_session_state.editor_responses
+        )
+    
+    # Build conversation history
+    messages = [{"role": "user", "content": system_prompt}]
+    
+    # Add previous dialogue
+    for exchange in st_session_state.dialogue_history:
+        messages.append({"role": "user", "content": exchange["question"]})
+        messages.append({"role": "assistant", "content": exchange["answer"]})
+    
+    # Add current question
+    messages.append({"role": "user", "content": user_question})
+    
+    # Get response from Claude
+    eic_answer = call_anthropic_dialogue(messages, anthropic_key)
+    
+    # VALIDATION STEP (for specialist performance questions)
+    if is_specialist_question and st_session_state.editor_responses:
+        validator = MECCAResponseValidator(st_session_state.editor_responses)
+        validation_result = validator.validate_claude_response(eic_answer)
+        
+        # Store validation metrics for analysis
+        if 'validation_history' not in st_session_state:
+            st_session_state.validation_history = []
+        
+        st_session_state.validation_history.append({
+            'question': user_question,
+            'answer': eic_answer,
+            'validation': validation_result,
+            'specialist_question': True
+        })
+        
+        # Log validation results for debugging
+        if not validation_result['overall_valid']:
+            print(f"MECCA VALIDATION FLAGS: {validation_result['flags']}")
+            print(f"TRANSPARENCY SCORE: {validation_result['transparency_score']}")
+            print(f"RECOMMENDATIONS: {validation_result['recommendations']}")
+            
+            # In development mode, optionally show validation warnings
+            if st.secrets.get("MECCA_DEBUG_MODE", False):
+                debug_info = f"\n\n[DEBUG - Validation Issues: {len(validation_result['flags'])} flags]"
+                eic_answer += debug_info
+    
+    return eic_answer
+
+# Wrapper function for backwards compatibility
+def enhanced_dialogue_handler(user_question, st_session_state, anthropic_key):
+    """Production wrapper that uses V2 enhanced handler"""
+    return enhanced_dialogue_handler_v2(user_question, st_session_state, anthropic_key)
