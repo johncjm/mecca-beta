@@ -1,5 +1,6 @@
 import streamlit as st
 import os
+st.write("Current directory files:", os.listdir('.'))
 from mecca_dialogue_prototype_calls import call_openai, call_anthropic, call_google, call_perplexity, enhanced_dialogue_handler
 from mecca_dialogue_prototype_prompts import get_editorial_prompt, get_eic_synthesis_prompt_v2
 
