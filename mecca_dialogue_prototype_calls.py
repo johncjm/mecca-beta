@@ -7,6 +7,7 @@ import google.generativeai as genai
 import requests
 import streamlit as st
 from typing import Dict, List, Tuple, Optional
+from datetime import datetime
 
 def call_openai(prompt, api_key):
     """Call OpenAI GPT-4 API"""
@@ -381,6 +382,7 @@ def enhanced_dialogue_handler_v2(user_question, st_session_state, anthropic_key)
     eic_answer = call_anthropic_dialogue(messages, anthropic_key)
     
     # VALIDATION STEP (for specialist performance questions)
+    validation_result = None
     if is_specialist_question and st_session_state.editor_responses:
         validator = MECCAResponseValidator(st_session_state.editor_responses)
         validation_result = validator.validate_claude_response(eic_answer)
@@ -406,6 +408,18 @@ def enhanced_dialogue_handler_v2(user_question, st_session_state, anthropic_key)
             if st.secrets.get("MECCA_DEBUG_MODE", False):
                 debug_info = f"\n\n[DEBUG - Validation Issues: {len(validation_result['flags'])} flags]"
                 eic_answer += debug_info
+    
+    # LOGGING IMPLEMENTATION
+    if st.secrets.get("ENABLE_LOGGING", False):
+        log_data = {
+            "timestamp": datetime.now().isoformat(),
+            "question": user_question,
+            "eic_response": eic_answer,
+            "validation_flags": validation_result.get('flags', []) if validation_result else [],
+            "is_specialist_question": is_specialist_question,
+            "transparency_score": validation_result.get('transparency_score', 0) if validation_result else 0
+        }
+        st.write("DEBUG LOG:", log_data)  # Shows in app when logging enabled
     
     return eic_answer
 
