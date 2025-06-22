@@ -1,604 +1,747 @@
-# mecca_dialogue_prototype_prompts.py
-# Enhanced version V2 with crew-designed anti-BS transparency protocols
-# Natural language prompt templates for MECCA interactive editorial system
+import streamlit as st
+import os
+from mecca_dialogue_prototype_calls import call_openai, call_anthropic, call_google, call_perplexity, enhanced_dialogue_handler
+from mecca_dialogue_prototype_prompts import get_editorial_prompt, get_eic_synthesis_prompt_v2
 
-def get_role_context(writer_role):
-    """Return role-specific context for prompts"""
-    contexts = {
-        "student": """
-        The writer is a journalism student learning the craft. Provide educational explanations 
-        and teaching moments. Explain WHY things need to be changed, not just WHAT needs changing. 
-        Use a supportive, instructional tone that helps them understand journalistic principles.
-        
-        IMPORTANT: Always identify 1-2 specific strengths in the writing to encourage the student's development.
-        """,
-        
-        "professional": """
-        The writer is a professional journalist. Provide concise, direct feedback focused on 
-        industry standards and efficiency. Flag issues clearly and prioritize based on potential 
-        impact to credibility and publication standards.
-        """,
-        
-        "other": """
-        The writer may have varying experience levels. Provide balanced feedback with helpful 
-        explanations while remaining concise. Focus on clarity, accuracy, and effective communication.
-        """
+# Configure page
+st.set_page_config(
+    page_title="MECCA Interactive Prototype - AI Editorial Assistant",
+    page_icon="📝",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
+
+# Initialize session state for dialogue
+if 'dialogue_history' not in st.session_state:
+    st.session_state.dialogue_history = []
+if 'original_article' not in st.session_state:
+    st.session_state.original_article = ""
+if 'eic_summary' not in st.session_state:
+    st.session_state.eic_summary = ""
+if 'context' not in st.session_state:
+    st.session_state.context = {}
+# Track if we have analysis results to display
+if 'has_analysis' not in st.session_state:
+    st.session_state.has_analysis = False
+# Store individual editor responses
+if 'editor_responses' not in st.session_state:
+    st.session_state.editor_responses = {}
+# Store validation history
+if 'validation_history' not in st.session_state:
+    st.session_state.validation_history = []
+# EiC view mode for toggle
+if 'eic_view_mode' not in st.session_state:
+    st.session_state.eic_view_mode = 'full'
+
+# Enhanced CSS for better styling and layout + Toggle Feature
+st.markdown("""
+<style>
+    .main-header {
+        font-size: 2.5rem;
+        font-weight: bold;
+        color: #1f77b4;
+        text-align: center;
+        margin-bottom: 1rem;
     }
-    return contexts.get(writer_role, contexts["other"])
-
-def get_advanced_context(advanced_options):
-    """Generate context from advanced options"""
-    if not advanced_options:
-        return ""
-    
-    context_parts = []
-    
-    # CRITICAL CONTEXT OVERRIDE - Custom context gets TOP PRIORITY
-    custom_context = advanced_options.get("custom_context")
-    if custom_context and custom_context.strip():
-        context_parts.append("=" * 50)
-        context_parts.append("🚨 CRITICAL CONTEXT OVERRIDE - TOP PRIORITY:")
-        context_parts.append(f"{custom_context}")
-        context_parts.append("CRITICAL: If custom context provided above, override default role boundaries and editorial approaches to follow these specific instructions.")
-        context_parts.append("=" * 50)
-    
-    # Content type context
-    content_type = advanced_options.get("content_type", "Standard news article")
-    context_parts.append(f"CONTENT TYPE: {content_type}")
-    
-    if content_type == "Investigation":
-        context_parts.append("Focus on fact-checking, sourcing, and verification standards appropriate for investigative journalism.")
-    elif content_type == "Feature":
-        context_parts.append("Consider narrative flow, character development, and engaging storytelling alongside factual accuracy.")
-    elif content_type == "Essay":
-        context_parts.append("Evaluate argument structure, evidence quality, and persuasive writing techniques.")
-    elif content_type == "Review":
-        context_parts.append("Assess balance, expertise demonstration, and fair evaluation criteria.")
-    elif content_type == "Standard news article":
-        context_parts.append("Apply standard news writing principles: lead, supporting facts, balanced reporting, and clear attribution.")
-    
-    # Target audience context
-    audience = advanced_options.get("target_audience", "General readers")
-    context_parts.append(f"TARGET AUDIENCE: {audience}")
-    
-    if audience == "Specialists":
-        context_parts.append("Readers will have domain expertise. Technical accuracy and depth are crucial.")
-    elif audience == "Students":
-        context_parts.append("Educational clarity and accessible explanations are important.")
-    elif audience == "General readers":
-        context_parts.append("Clear explanations of technical concepts and accessible language are essential.")
-    
-    # Process stage context
-    stage = advanced_options.get("process_stage", "Draft review")
-    context_parts.append(f"PROCESS STAGE: {stage}")
-    
-    if stage == "Fact-check focus":
-        context_parts.append("Prioritize verification of factual claims, sourcing, and accuracy over style issues.")
-    elif stage == "Polish/copy edit":
-        context_parts.append("Focus on grammar, style, clarity, and final publication readiness.")
-    elif stage == "Draft review":
-        context_parts.append("Address both structural and detailed issues appropriate for comprehensive revision.")
-    
-    # Category focus
-    focus = advanced_options.get("category_emphasis", "Comprehensive")
-    if focus != "Comprehensive":
-        context_parts.append(f"FOCUS AREA: {focus}")
-        
-        if focus == "Fact-checking heavy":
-            context_parts.append("Emphasize verification, sourcing, and factual accuracy above other concerns.")
-        elif focus == "Style focus":
-            context_parts.append("Emphasize writing quality, clarity, tone, and adherence to style guidelines.")
-        elif focus == "Structure focus":
-            context_parts.append("Emphasize organization, flow, narrative structure, and logical development.")
-    
-    # Style guide
-    style_guide = advanced_options.get("style_guide", "AP")
-    if style_guide:
-        context_parts.append(f"STYLE GUIDE: {style_guide}")
-        
-        if style_guide == "AP":
-            context_parts.append("Follow Associated Press style for journalism standards.")
-        elif style_guide == "Chicago":
-            context_parts.append("Follow Chicago Manual of Style guidelines.")
-        elif style_guide == "APA":
-            context_parts.append("Follow APA style guidelines appropriate for academic writing.")
-        elif style_guide == "MLA":
-            context_parts.append("Follow MLA style guidelines for humanities writing.")
-    
-    # Target length
-    target_length = advanced_options.get("target_length")
-    if target_length:
-        context_parts.append(f"TARGET LENGTH: {target_length}")
-        context_parts.append("Consider whether the current length serves the content well and suggest adjustments if needed.")
-    
-    # Editorial role context
-    editorial_role = advanced_options.get("editorial_role")
-    if editorial_role:
-        context_parts.append(f"EDITORIAL APPROACH: {editorial_role}")
-        
-        if editorial_role == "Writing Coach":
-            context_parts.append("Adopt a mentoring perspective focused on skill development and improvement.")
-        elif editorial_role == "Copy Editor":
-            context_parts.append("Focus on grammar, style, accuracy, and publication readiness.")
-        elif editorial_role == "News Desk Editor":
-            context_parts.append("Apply newsroom standards with focus on speed, accuracy, and reader engagement.")
-        elif editorial_role == "Feature Editor":
-            context_parts.append("Emphasize storytelling, narrative flow, and feature-specific techniques.")
-        elif editorial_role == "Fact-Checker Focus":
-            context_parts.append("Prioritize verification and sourcing above all other concerns.")
-        elif editorial_role == "Style Editor":
-            context_parts.append("Focus primarily on voice, tone, and stylistic consistency.")
-    
-    return "\n".join(context_parts)
-
-def get_editorial_prompt(model_name, article_text, writer_role="professional", advanced_options=None):
-    """Generate enhanced model-specific prompts with organized, practical feedback requirements"""
-    
-    role_context = get_role_context(writer_role)
-    advanced_context = get_advanced_context(advanced_options)
-    
-    # Handle headline if provided
-    headline_section = ""
-    if advanced_options and advanced_options.get("headline"):
-        headline_section = f"""
-HEADLINE: {advanced_options['headline']}
-
-Please also evaluate the headline for:
-- Accuracy and clarity
-- Appropriate tone for the content type
-- Effectiveness in attracting target audience
-- Length and style guide compliance
-
-"""
-    
-    # Universal organization and practical requirements
-    universal_organization_section = """
-🏗️ MANDATORY FEEDBACK ORGANIZATION:
-Structure your response using these sections in this order:
-1. CRITICAL ERRORS (factual, legal, credibility issues that could embarrass publication)
-2. GRAMMAR & MECHANICS (specific typos, punctuation, style errors with exact locations)
-3. [YOUR SPECIALTY SECTION] (see role-specific requirements below)
-4. VERIFICATION NEEDED (specific claims requiring manual fact-checking)
-
-LOCATION SPECIFICITY REQUIREMENT:
-- Always reference specific paragraphs: "Paragraph 3:" or "Para 7, sentence 2:"
-- For corrections, use format: "Para X: 'incorrect text' → 'correct text'"
-- Be precise about where errors occur for easy fixing
-
-"""
-    
-    # Enhanced critical verification requirements
-    critical_verification_section = """
-🚨 ENHANCED CRITICAL VERIFICATION:
-ALWAYS flag these for manual verification:
-- Current titles/positions of public officials (verify exact office held)
-- Vital status of any person mentioned in current context (alive/deceased)
-- Recent dates, events, and statistics (require authoritative sources)
-- Claims that could embarrass publication if wrong
-
-VERIFICATION FORMAT:
-- ✓ VERIFIED: [claim] - [specific source and verification method]
-- ⚠️ FLAG: [claim] - [why manual verification needed]
-- ❌ FALSE: [claim] - [correct information with source]
-
-"""
-    
-    # Quote guidance for all specialists
-    quote_guidance_section = """
-🎯 QUOTE EVALUATION GUIDANCE:
-When reviewing quotes in the article, remember:
-- Quotes serve a DOCUMENTARY function, not a stylistic one
-- Never suggest removing quotes to "improve flow" or match preferred tone
-- Valid quote feedback includes: length vs. content value, repetition, clarity
-- Invalid quote feedback includes: removing quotes for being "off-message" or negative
-- Sources speak in their own voice - this is not a flaw to be fixed
-
-APPROPRIATE QUOTE SUGGESTIONS:
-✅ "This 200-word quote could be condensed to focus on the key 50 words"
-✅ "Quote is repetitive - consider shortening to just the newsworthy portion"
-❌ "Remove this quote because it doesn't match the article's tone"
-❌ "Paraphrase this instead of quoting for better flow"
-
-"""
-    
-    # Model-specific enhanced requirements
-    model_specific_sections = {
-        "gpt-4o": """
-YOUR ENHANCED SPECIALIZATION: COMPREHENSIVE ANALYSIS + GRANULAR EDITING
-
-SECTION 3 - COMPREHENSIVE ANALYSIS:
-- Overall structure and organization assessment
-- Logical flow and argument development
-- Reader comprehension and engagement issues
-- Paragraph transitions and coherence
-
-MANDATORY GRANULAR EDITING:
-After your comprehensive analysis, include dedicated "GRANULAR EDITING" subsection:
-- Scan every paragraph for grammar errors, typos, punctuation issues
-- Format: "Para X, sentence Y: 'wrong text' → 'correct text'"
-- Flag ALL mechanical errors: spelling, capitalization, number consistency
-- Check for missing commas, apostrophe errors, subject-verb agreement
-- Identify unclear pronoun references and awkward constructions
-
-EXAMPLE GRANULAR EDITING:
-"Para 1, sentence 1: 'That'ss' → 'That's'
-Para 2, sentence 3: 'jjoined' → 'joined'
-Para 5: 'was as' → 'was'"
-
-FOCUS: Provide both big-picture structural analysis AND detailed line editing.
-""",
-        
-        "gemini": """
-YOUR ENHANCED SPECIALIZATION: COPY EDITING + TYPO HUNTING
-
-SECTION 3 - COPY EDITING & STYLE:
-- Voice and tone consistency
-- Style guide compliance and writing clarity
-- Language accessibility and readability
-- Sentence structure and word choice issues
-
-MANDATORY TYPO HUNT:
-After style feedback, include dedicated "TYPO HUNT" section:
-- Systematically scan each paragraph for spelling errors
-- Check all punctuation: commas, periods, apostrophes, quotation marks
-- Verify consistent number formatting (numerals vs. words)
-- Flag capitalization errors and style inconsistencies
-- Identify missing words or repeated words
-- Format findings as: "Para X: 'error' → 'correction'"
-
-TYPO HUNT EXAMPLES:
-"Para 3: Missing comma after 'Saturday'
-Para 8: 'its' → 'it's' (possessive vs. contraction)
-Para 12: '10,000' should be 'ten thousand' per AP style"
-
-FOCUS: Be the meticulous copy editor who catches every mechanical error.
-""",
-        
-        "perplexity": """
-YOUR ENHANCED SPECIALIZATION: FACT-CHECKING ONLY
-
-🚨 CRITICAL RESTRICTION: Do NOT comment on style, structure, grammar, organization, headlines, or writing quality.
-Your ONLY job is verification of factual claims. Stay in your lane.
-
-SECTION 3 - FACT VERIFICATION ONLY:
-MANDATORY FACT-CHECKING SCOPE:
-- Names, titles, and current positions of all people mentioned
-- Dates, locations, and numerical claims
-- Recent events and their participants
-- Statistics and their sources
-- Historical references and their accuracy
-
-🚫 ABSOLUTELY FORBIDDEN:
-- Commenting on paragraph structure
-- Suggesting headline changes
-- Advising on writing style or tone
-- Recommending organizational improvements
-- Giving editorial advice beyond fact verification
-
-WEB SEARCH REQUIREMENTS:
-- Use current, authoritative sources only (.gov, .edu, major news)
-- Provide exact URLs and direct quotes from sources
-- Cross-reference claims with multiple independent sources
-- Check recency of information (prefer sources from last 6 months)
-
-FACT-CHECKING FORMAT:
-"CLAIM: [exact text from article]
-VERIFICATION: ✓/⚠️/❌ [status]
-SOURCE: [exact URL and relevant quote]
-NOTE: [any important context or limitations]"
-
-FOCUS: Pure fact verification with rock-solid sourcing. IGNORE EVERYTHING ELSE.
-""",
-        
-        "claude": """
-YOUR ENHANCED SPECIALIZATION: TONE/STYLE + CREDIBILITY OVERSIGHT
-
-SECTION 3 - TONE & AUDIENCE APPROPRIATENESS:
-- Voice consistency and audience appropriateness
-- Engagement level and accessibility
-- Tone alignment with content goals
-- Overall readability and flow
-
-CREDIBILITY OVERSIGHT:
-Even though tone/style is your focus, flag obvious credibility issues:
-- Claims that sound implausible or need verification
-- Attribution problems or unclear sourcing
-- Potential legal or ethical concerns
-- Obvious factual errors that others might miss
-
-FOCUS: Ensure the writing connects with intended audience while maintaining credibility.
-"""
+    .about-section {
+        background-color: #f8f9fa;
+        padding: 1.5rem;
+        border-radius: 10px;
+        margin-bottom: 1.5rem;
+        border-left: 4px solid #1f77b4;
+    }
+    .learn-more-inline {
+        display: inline-block;
+        margin-left: 10px;
+        vertical-align: top;
+    }
+    .section-header {
+        font-size: 1.3rem;
+        font-weight: bold;
+        color: #333;
+        margin-bottom: 0.5rem;
+        margin-top: 1rem;
+    }
+    .radio-group {
+        font-size: 0.9rem;
+        color: #666;
+    }
+    .custom-context-container {
+        margin-top: 1rem;
+    }
+    .fact-check-warning {
+        font-style: italic;
+        color: #d63384;
+        font-size: 0.85rem;
+        margin-top: 0.3rem;
+    }
+    .word-limit-notice {
+        background-color: #e7f3ff;
+        padding: 0.8rem;
+        border-radius: 6px;
+        border-left: 3px solid #1f77b4;
+        margin-bottom: 1rem;
+        font-size: 0.9rem;
+    }
+    .eic-summary {
+        background-color: #fff3cd;
+        padding: 1.5rem;
+        border-radius: 10px;
+        border-left: 4px solid #ffc107;
+        margin-bottom: 1rem;
+    }
+    .dialogue-section {
+        background-color: #e8f5e8;
+        padding: 1.5rem;
+        border-radius: 10px;
+        border-left: 4px solid #28a745;
+        margin-bottom: 1rem;
+    }
+    .ai-disclaimer {
+        background-color: #f8d7da;
+        padding: 1rem;
+        border-radius: 8px;
+        border-left: 4px solid #dc3545;
+        margin-bottom: 1rem;
+        font-size: 0.9rem;
+    }
+    .chat-message {
+        padding: 0.5rem;
+        margin: 0.5rem 0;
+        border-radius: 5px;
+    }
+    .user-message {
+        background-color: #e3f2fd;
+        text-align: right;
+    }
+    .eic-message {
+        background-color: #f1f8e9;
+    }
+    .specialist-columns {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 20px;
+        max-height: 600px;
+    }
+    .specialist-column {
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 1rem;
+        overflow-y: auto;
+        background-color: #ffffff;
+    }
+    .specialist-column h4 {
+        margin-top: 0;
+        color: #1f77b4;
+        border-bottom: 2px solid #e9ecef;
+        padding-bottom: 0.5rem;
+    }
+    .search-bar {
+        width: 100%;
+        padding: 0.5rem;
+        margin-bottom: 1rem;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+    }
+    /* Improve tab styling */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+        margin-bottom: 1rem;
+    }
+    .stTabs [data-baseweb="tab"] {
+        height: 50px;
+        padding-left: 20px;
+        padding-right: 20px;
+        background-color: #f0f2f6;
+        border-radius: 8px 8px 0px 0px;
+        font-weight: 500;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #ffffff;
+        border-bottom: 3px solid #1f77b4;
+    }
+    .stTabs [data-baseweb="tab-panel"] {
+        padding-top: 1rem;
     }
     
-    base_prompt = f"""You are acting as a professional editor reviewing this article using MECCA's enhanced practical feedback approach.
-
-{role_context}
-
-{advanced_context}
-
-{universal_organization_section}
-
-{critical_verification_section}
-
-{quote_guidance_section}
-
-{model_specific_sections.get(model_name, model_specific_sections["claude"])}
-
-{headline_section}ARTICLE TO REVIEW:
-{article_text}
-
-ENHANCED FEEDBACK REQUIREMENTS:
-1. Use the mandatory section structure (Critical/Grammar/Specialty/Verification)
-2. Provide specific paragraph references for all issues
-3. Include exact correction format for mechanical errors
-4. Focus on practical, actionable feedback that writers can immediately implement
-5. Prioritize issues by potential embarrassment to publication
-
-EMBARRASSMENT TEST PRIORITY:
-- CRITICAL: Could humiliate publication (wrong names, false claims)
-- HIGH: Significantly hurts credibility (unclear sourcing, major grammar)
-- MEDIUM: Noticeable quality issues (style inconsistencies, minor errors)
-- LOW: Polish improvements (enhanced clarity, better word choice)
-
-Remember: Provide specific, practical feedback that makes editing efficient and effective."""
-
-    return base_prompt
-
-def get_eic_synthesis_prompt_v2(gpt_response, gemini_response, claude_response, perplexity_response, writer_role="professional", advanced_options=None):
-    """Enhanced EiC synthesis prompt V2 with light transparency requirements"""
-    
-    role_guidance = {
-        "student": "Focus on learning opportunities and educational explanations. Include encouragement about what the student is doing well.",
-        "professional": "Focus on efficiency and industry standards with direct, actionable priorities.",
-        "other": "Balance detail with clarity for a general audience."
+    /* EiC Toggle Styles */
+    .eic-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid #e9ecef;
     }
     
-    advanced_context = get_advanced_context(advanced_options) if advanced_options else ""
+    .eic-title {
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: #333;
+        margin: 0;
+    }
     
-    return f"""You are the Editor-in-Chief synthesizing feedback from our editorial team. {role_guidance.get(writer_role, role_guidance["other"])}
+    .eic-toggle {
+        display: flex;
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        padding: 4px;
+        border: 1px solid #dee2e6;
+    }
+    
+    .eic-toggle-btn {
+        padding: 8px 16px;
+        border: none;
+        background: transparent;
+        border-radius: 6px;
+        font-size: 0.9rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        color: #6c757d;
+    }
+    
+    .eic-toggle-btn.active {
+        background-color: #ffffff;
+        color: #1f77b4;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .eic-toggle-btn:hover:not(.active) {
+        color: #495057;
+        background-color: #e9ecef;
+    }
+    
+    /* Content visibility classes */
+    .eic-full-content {
+        display: block;
+    }
+    
+    .eic-condensed-content {
+        display: none;
+    }
+    
+    .view-quick-fixes .eic-full-content {
+        display: none;
+    }
+    
+    .view-quick-fixes .eic-condensed-content {
+        display: block;
+    }
+    
+    /* Quick fixes styling */
+    .quick-fixes-summary {
+        background-color: #fff3cd;
+        padding: 1.5rem;
+        border-radius: 10px;
+        border-left: 4px solid #ffc107;
+        margin-bottom: 1rem;
+    }
+    
+    .error-count-overview {
+        background-color: #e7f3ff;
+        padding: 1rem;
+        border-radius: 6px;
+        margin-bottom: 1rem;
+        font-size: 0.9rem;
+    }
+    
+    .quick-fix-item {
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #e9ecef;
+    }
+    
+    .quick-fix-item:last-child {
+        border-bottom: none;
+    }
+    
+    .fix-severity {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: bold;
+        margin-right: 8px;
+    }
+    
+    .severity-critical {
+        background-color: #f8d7da;
+        color: #721c24;
+    }
+    
+    .severity-high {
+        background-color: #fff3cd;
+        color: #856404;
+    }
+    
+    .severity-medium {
+        background-color: #d1ecf1;
+        color: #0c5460;
+    }
+</style>
 
-{advanced_context}
+<script>
+function toggleEiCView(mode) {
+    const container = document.querySelector('.eic-container');
+    const buttons = document.querySelectorAll('.eic-toggle-btn');
+    
+    // Remove active class from all buttons
+    buttons.forEach(btn => btn.classList.remove('active'));
+    
+    // Add active class to clicked button
+    const targetBtn = document.querySelector(`[data-mode="${mode}"]`);
+    if (targetBtn) {
+        targetBtn.classList.add('active');
+    }
+    
+    // Toggle container class
+    if (mode === 'quick') {
+        container.classList.add('view-quick-fixes');
+    } else {
+        container.classList.remove('view-quick-fixes');
+    }
+}
 
-EDITORIAL TEAM RESPONSES:
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Set default view to full analysis
+    setTimeout(function() {
+        const fullBtn = document.querySelector('[data-mode="full"]');
+        if (fullBtn) {
+            fullBtn.classList.add('active');
+        }
+    }, 100);
+});
+</script>
+""", unsafe_allow_html=True)
 
-GPT-4 COMPREHENSIVE ANALYSIS:
+def parse_eic_content(eic_response):
+    """Parse EiC response to separate quick fixes from full analysis"""
+    
+    # Look for our structured markers
+    quick_fixes_start = eic_response.find("<!-- QUICK_FIXES_START -->")
+    quick_fixes_end = eic_response.find("<!-- QUICK_FIXES_END -->")
+    full_analysis_start = eic_response.find("<!-- FULL_ANALYSIS_START -->")
+    full_analysis_end = eic_response.find("<!-- FULL_ANALYSIS_END -->")
+    
+    if quick_fixes_start != -1 and quick_fixes_end != -1:
+        quick_fixes_content = eic_response[quick_fixes_start+len("<!-- QUICK_FIXES_START -->"):quick_fixes_end].strip()
+    else:
+        # Fallback: extract Quick Fixes section manually
+        lines = eic_response.split('\n')
+        quick_fixes_lines = []
+        in_quick_fixes = False
+        
+        for line in lines:
+            if '🎯 QUICK FIXES NEEDED' in line:
+                in_quick_fixes = True
+                quick_fixes_lines.append(line)
+            elif in_quick_fixes and (line.startswith('EDITORIAL SUMMARY') or line.startswith('PRIORITY ACTION LIST')):
+                break
+            elif in_quick_fixes:
+                quick_fixes_lines.append(line)
+        
+        quick_fixes_content = '\n'.join(quick_fixes_lines)
+    
+    if full_analysis_start != -1 and full_analysis_end != -1:
+        full_analysis_content = eic_response[full_analysis_start+len("<!-- FULL_ANALYSIS_START -->"):full_analysis_end].strip()
+    else:
+        # Fallback: use entire response
+        full_analysis_content = eic_response
+    
+    return quick_fixes_content, full_analysis_content
+
+# Main header
+st.markdown('<div class="main-header">📝 MECCA Interactive Prototype</div>', unsafe_allow_html=True)
+
+# About section with inline Learn More button
+st.markdown("""
+<div class="about-section">
+The <strong>Multiple Edit and Cross-Check Assistant</strong> aims to <strong>HELP</strong> writers and editors, not <strong>REPLACE</strong> them. This interactive prototype adds dialogue capability - you can ask the Editor-in-Chief questions about their feedback to better understand the reasoning behind suggestions.
+</div>
+""", unsafe_allow_html=True)
+
+# Inline Learn More expandable section
+with st.expander("📖 Learn More About MECCA Interactive"):
+    st.markdown("""
+    **How MECCA Interactive Works:**
+    
+    MECCA uses a **hybrid specialization approach** with added dialogue capability:
+    
+    • **GPT-4 (Comprehensive Analysis)**: Primary focus on organization, structure, and comprehensive review
+    • **Gemini (Copy Editing & Style)**: Primary focus on grammar, style, tone, and language clarity
+    • **Perplexity (Fact-Checking)**: Web search capabilities for real-time verification (with reliability monitoring)
+    • **Claude (Editor-in-Chief)**: Synthesizes all feedback + **answers your questions with complete transparency**
+    
+    **Enhanced Features:**
+    
+    • **Honest AI Assessment**: Shows you exactly what each AI found (including their mistakes)
+    • **Educational Dialogue**: Learn why AI systems fail and how to verify their work
+    • **Transparency Requirements**: EiC must quote specialists exactly, including their errors
+    • **"Not an Oracle" Approach**: Teaches appropriate skepticism about AI outputs
+    
+    **Best Practices:**
+    
+    • Use dialogue to understand both AI strengths AND limitations
+    • Always verify AI fact-checking independently
+    • Learn from AI failures as teaching moments
+    • Maintain editorial control over all decisions
+    """)
+
+# Writer context and options
+st.markdown('<div class="section-header">📝 Step 1: Tell us about you and what you\'re working on</div>', unsafe_allow_html=True)
+st.markdown("*The more the AI models know about what you're trying to do and what assistance you need, the better job they'll do in helping you.*")
+
+# Writer role selection
+writer_role = st.selectbox(
+    "What describes you best?",
+    ["Professional journalist", "Student journalist", "Academic writer", "Content creator", "Other writer"],
+    index=0,
+    help="This helps MECCA adjust the tone and depth of feedback"
+)
+
+# Editorial approach selection - 2 columns layout
+col1, col2 = st.columns(2)
+
+with col1:
+    st.markdown("**How should the editors approach your work?**")
+    editorial_role = st.radio(
+        "editorial_role_radio",
+        ["Copy Editor", "Writing Coach", "News Desk Editor", "Feature Editor", "Fact-Checker Focus", "Style Editor"],
+        index=1,  # Default to Writing Coach
+        help="This determines how the AI editors will focus their feedback and adopt different editorial perspectives when reviewing your work.",
+        horizontal=True,
+        label_visibility="collapsed"
+    )
+    
+    # Fact-checker warning
+    if editorial_role == "Fact-Checker Focus":
+        st.markdown('<div class="fact-check-warning">MECCA\'s fact-checking is experimental and often unreliable -- as is the case currently with all AI fact-checking programs. Treat all factual claims as suggestions requiring independent verification.</div>', unsafe_allow_html=True)
+    
+    st.markdown("**Content Type**")
+    content_type = st.radio(
+        "content_type_radio",
+        ["Standard news article", "Investigation", "Feature", "Essay", "Review", "Other"],
+        index=0,
+        horizontal=True,
+        label_visibility="collapsed"
+    )
+
+with col2:
+    st.markdown("**Target Audience**")
+    target_audience = st.radio(
+        "target_audience_radio",
+        ["General readers", "Specialists", "Students", "Other"],
+        index=0,
+        horizontal=True,
+        label_visibility="collapsed"
+    )
+
+    # Move Custom Editor Context to right column
+    st.markdown('<div class="custom-context-container">', unsafe_allow_html=True)
+    custom_context = st.text_area(
+        "**Custom Prompts** (optional)",
+        placeholder='For instance, "Verify all titles" or "I\'m aiming at a breezy tone" or "Am I leaving anything important out?"',
+        height=80,
+        help="Use this optional space to be more specific about what you need or context that would help the AI models provide better assistance."
+    )
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# Additional options row
+st.markdown("**Process Stage**")
+process_stage = st.radio(
+    "process_stage_radio",
+    ["Draft review", "Polish/copy edit", "Fact-check focus"],
+    index=0,
+    horizontal=True,
+    label_visibility="collapsed"
+)
+
+col3, col4 = st.columns(2)
+
+with col3:
+    st.markdown("**Style Guide**")
+    style_guide = st.radio(
+        "style_guide_radio",
+        ["AP", "Chicago", "MLA", "APA", "House style", "Other"],
+        index=0,
+        horizontal=True,
+        label_visibility="collapsed"
+    )
+
+with col4:
+    target_length = st.text_input("**Target Length** (optional)", placeholder="e.g., 800 words")
+
+# Article input section
+st.markdown('<div class="section-header">📄 Step 2: Your Article</div>', unsafe_allow_html=True)
+
+# Simplified word limit notice
+st.markdown("""
+<div class="word-limit-notice">
+<strong>3,000 words max.</strong> Processing may take a minute or more — do not refresh.
+</div>
+""", unsafe_allow_html=True)
+
+headline = st.text_input(
+    "**Headline:**",
+    placeholder="Enter your article headline here...",
+    key="headline_input"
+)
+
+article_text = st.text_area(
+    "**Article Text:**",
+    placeholder="Paste your article text here for enhanced editorial review...",
+    height=200,
+    key="article_input"
+)
+
+# Analysis button
+analyze_button = st.button(
+    "🔍 Get Enhanced Editorial Review",
+    type="primary",
+    use_container_width=True
+)
+
+# Analysis results
+if analyze_button and article_text.strip():
+    # Reset dialogue history and analysis state for new analysis
+    st.session_state.dialogue_history = []
+    st.session_state.has_analysis = False
+    st.session_state.editor_responses = {}
+    st.session_state.validation_history = []
+    
+    with st.spinner("🤖 Your enhanced editorial team is reviewing your article..."):
+        
+        # Get API keys
+        openai_key = st.secrets.get("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY")
+        anthropic_key = st.secrets.get("ANTHROPIC_API_KEY") or os.getenv("ANTHROPIC_API_KEY") 
+        google_key = st.secrets.get("GOOGLE_API_KEY") or os.getenv("GOOGLE_API_KEY")
+        perplexity_key = st.secrets.get("PERPLEXITY_API_KEY") or os.getenv("PERPLEXITY_API_KEY")
+        
+        # Prepare context for models
+        context = {
+            "content_type": content_type,
+            "target_audience": target_audience,
+            "process_stage": process_stage,
+            "category_emphasis": "Comprehensive",  # Default since we removed the option
+            "style_guide": style_guide,
+            "target_length": target_length,
+            "custom_context": custom_context,
+            "headline": headline,
+            "writer_role": writer_role,
+            "editorial_role": editorial_role
+        }
+        
+        # Store in session state for dialogue
+        st.session_state.context = context
+        st.session_state.original_article = f"HEADLINE: {headline}\n\n{article_text}"
+        
+        # Map writer role to expected format
+        role_mapping = {
+            "Professional journalist": "professional",
+            "Student journalist": "student", 
+            "Academic writer": "other",
+            "Content creator": "other",
+            "Other writer": "other"
+        }
+        mapped_role = role_mapping.get(writer_role, "other")
+        
+        # Call individual models with enhanced prompts
+        gpt_response = call_openai(get_editorial_prompt("gpt-4o", article_text, mapped_role, context), openai_key) if openai_key else "OpenAI API key not configured"
+        gemini_response = call_google(get_editorial_prompt("gemini", article_text, mapped_role, context), google_key) if google_key else "Google API key not configured"
+        perplexity_response = call_perplexity(get_editorial_prompt("perplexity", article_text, mapped_role, context), perplexity_key) if perplexity_key else "Perplexity API key not configured"
+        
+        # Store editor responses in session state
+        st.session_state.editor_responses = {
+            "gpt": gpt_response,
+            "gemini": gemini_response,
+            "perplexity": perplexity_response
+        }
+        
+        # Prepare combined responses for EiC
+        combined_analysis = f"""
+GPT-4 Editor Response:
 {gpt_response}
 
-GEMINI COPY EDITING & STYLE:
+Gemini Editor Response:
 {gemini_response}
 
-CLAUDE TONE/STYLE:
-{claude_response}
-
-PERPLEXITY FACT-CHECKING:
+Perplexity Fact-Checker Response:
 {perplexity_response}
+        """
+        
+        # Call Claude as Editor-in-Chief with enhanced synthesis + toggle support
+        claude_eic_prompt = get_eic_synthesis_prompt_v2(gpt_response, gemini_response, "", perplexity_response, mapped_role, context)
+        claude_response = call_anthropic(claude_eic_prompt, combined_analysis, anthropic_key) if anthropic_key else "Anthropic API key not configured"
+        
+        # Store EiC response for dialogue
+        st.session_state.eic_summary = claude_response
+        st.session_state.has_analysis = True
 
-SYNTHESIS REQUIREMENTS WITH TOGGLE SUPPORT:
+elif analyze_button:
+    st.warning("⚠️ Please enter some article text to analyze.")
 
-CRITICAL: Structure your response using these EXACT HTML comments for the toggle feature:
+# Display results with tabbed interface
+if st.session_state.has_analysis:
+    # Enhanced AI Disclaimer
+    st.markdown("""
+    <div class="ai-disclaimer">
+    <strong>⚠️ IMPORTANT: MECCA's fact-checking is experimental and often unreliable -- as is the case currently with all AI fact-checking programs. Treat all factual claims as suggestions requiring independent verification. We strive to uncover those errors and show them to you as illustrations of AI limitations in real-time as part of our educational mission.</strong><br>
+    This AI-generated feedback is advisory only and includes validation monitoring. The writer maintains full responsibility for fact-checking, editorial decisions, and final content. MECCA shows you exactly what each AI found (including their mistakes) to teach appropriate skepticism about AI verification.
+    </div>
+    """, unsafe_allow_html=True)
 
-<!-- QUICK_FIXES_START -->
-🎯 QUICK FIXES NEEDED:
-[Provide 8-12 immediate, actionable corrections with paragraph numbers]
-- Format: "Para X: [CRITICAL/GRAMMAR/FACT/STYLE] Fix Y" 
-- Include severity markers and error types
-- Prioritize by embarrassment potential and ease of fixing
-- Examples: 
-  • "Para 1: [CRITICAL] Verify Mario Cuomo status (deceased 2015)"
-  • "Para 3: [GRAMMAR] 'jjoined' → 'joined'"
-  • "Para 7: [FACT] Confirm Mamdani's title (Assembly vs. Senate)"
-
-📊 ERROR OVERVIEW:
-[Provide count summary like: "5 Factual issues, 12 Grammar corrections, 3 Style improvements"]
-
-⚠️ CRITICAL VERIFICATION FLAGS:
-[List only the most urgent fact-checking needs with brief context]
-- Format: "⚠️ VERIFY: [claim] - [why it matters/potential embarrassment]"
-- Focus on names, titles, dates, statistics that could humiliate if wrong
-- Include brief note about why verification is critical
-<!-- QUICK_FIXES_END -->
-
-<!-- FULL_ANALYSIS_START -->
-EDITORIAL SUMMARY:
-[Provide 1-2 paragraph assessment of overall quality and consensus on major issues]
-
-DETAILED PRIORITY ACTION LIST:
-Using "embarrassment test" prioritization:
-1. CRITICAL - Issues that could humiliate publication
-2. HIGH PRIORITY - Credibility and quality concerns  
-3. MEDIUM PRIORITY - Style and clarity improvements
-
-COMPREHENSIVE VERIFICATION REQUIREMENTS:
-[List specific claims needing manual verification with detailed guidance on sources to check]
-
-SYNTHESIS NOTES:
-- Resolve any conflicts between specialist feedback
-- Highlight where multiple specialists agreed (especially on errors)
-- Note any specialist blind spots or missed issues
-- Focus on actionable next steps with clear priorities
-
-LIGHT TRANSPARENCY REQUIREMENT:
-When multiple specialists agree on an issue, you may note this consensus.
-When specialists disagree or miss obvious issues, briefly acknowledge this without extensive analysis.
-Save detailed specialist performance analysis for the dialogue feature.
-
-EDUCATIONAL CONTEXT:
-[Include brief pedagogical explanations and learning opportunities]
-[Focus on editorial principles rather than AI performance analysis]
-<!-- FULL_ANALYSIS_END -->
-
-IMPORTANT DISCLAIMER:
-Always end with: "This AI-generated feedback is advisory only. The writer maintains full responsibility for fact-checking, editorial decisions, and final content. All suggestions, especially those related to factual claims, must be independently verified."
-
-CRITICAL FORMATTING REQUIREMENTS:
-1. Use the exact HTML comment markers shown above
-2. Make Quick Fixes section scannable with clear bullet points
-3. Include severity/type markers for each fix
-4. Provide error count overview for quick assessment
-5. Ensure Full Analysis contains educational content focused on editorial principles
-
-Focus on making the writer's revision process efficient and effective with toggle support."""
-
-def get_enhanced_dialogue_system_prompt_v2(original_article, eic_summary, context, individual_responses):
-    """
-    Enhanced transparency prompt V2 implementing crew's anti-BS techniques
-    Maximum transparency enforcement for specialist performance questions
-    """
+    # Step 3 header
+    st.markdown('<div class="section-header">📋 Step 3: Your Editorial Feedback</div>', unsafe_allow_html=True)
     
-    content_type = context.get('content_type', 'article')
-    target_audience = context.get('target_audience', 'general readers')
-    writer_role = context.get('writer_role', 'professional')
+    # Create tabs for organized feedback display
+    tab1, tab2, tab3 = st.tabs([
+        "📋 Editor-in-Chief Overview", 
+        "📝 Full Individual Responses", 
+        "💬 Ask the Editor"
+    ])
     
-    return f"""You are the Editor-in-Chief and CHIEF TRANSPARENCY OFFICER for MECCA.
+    with tab1:
+        # EiC Header with Toggle
+        st.markdown("""
+        <div class="eic-header">
+            <h2 class="eic-title">📋 Editor-in-Chief Summary</h2>
+            <div class="eic-toggle">
+                <button class="eic-toggle-btn" data-mode="full" onclick="toggleEiCView('full')">
+                    📚 Full Analysis
+                </button>
+                <button class="eic-toggle-btn" data-mode="quick" onclick="toggleEiCView('quick')">
+                    📝 Quick Fixes
+                </button>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("*Synthesis of all editorial feedback using the 'embarrassment test' for prioritization*")
+        
+        # EiC content container with toggle classes
+        st.markdown('<div class="eic-container">', unsafe_allow_html=True)
+        
+        # Parse the EiC response to separate quick fixes from full analysis
+        eic_content = st.session_state.eic_summary
+        quick_fixes_content, full_analysis_content = parse_eic_content(eic_content)
+        
+        # Quick Fixes Content (hidden by default)
+        st.markdown('<div class="eic-condensed-content">', unsafe_allow_html=True)
+        st.markdown('<div class="quick-fixes-summary">', unsafe_allow_html=True)
+        st.markdown(quick_fixes_content)
+        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Full Analysis Content (visible by default)  
+        st.markdown('<div class="eic-full-content">', unsafe_allow_html=True)
+        st.markdown(full_analysis_content)
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        st.markdown('</div>', unsafe_allow_html=True)  # Close eic-container
+        
+        # Navigation hints
+        st.markdown("---")
+        st.markdown("""
+        **💡 Next Steps:**
+        - Check **Full Individual Responses** tab for detailed specialist feedback
+        - Use **Ask the Editor** tab to understand the reasoning behind suggestions
+        - Remember: This is advisory feedback - you maintain full editorial control
+        """)
+    
+    with tab2:
+        st.markdown("## Full Individual Responses")
+        st.markdown("*Compare all specialist feedback side by side - transparency is key to learning AI limitations.*")
+        
+        # Search bar for responses (future enhancement)
+        search_query = st.text_input("🔍 Search within responses:", placeholder="Search for specific terms across all responses...", key="response_search")
+        
+        # Three-column layout for specialist responses
+        st.markdown('<div class="specialist-columns">', unsafe_allow_html=True)
+        
+        editor_responses = st.session_state.editor_responses
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.markdown("#### 📝 GPT-4 (Comprehensive Analysis)")
+            st.markdown("**Focus:** Organization, structure, comprehensive review")
+            
+            gpt_content = editor_responses.get("gpt", "Response not available")
+            if search_query and search_query.lower() in gpt_content.lower():
+                # Simple highlight effect (could be enhanced)
+                st.markdown(f"🔍 *Contains: '{search_query}'*")
+            st.markdown(gpt_content)
+        
+        with col2:
+            st.markdown("#### ✏️ Gemini (Copy Editing & Style)")
+            st.markdown("**Focus:** Grammar, style, language clarity")
+            
+            gemini_content = editor_responses.get("gemini", "Response not available")
+            if search_query and search_query.lower() in gemini_content.lower():
+                st.markdown(f"🔍 *Contains: '{search_query}'*")
+            st.markdown(gemini_content)
+        
+        with col3:
+            st.markdown("#### 🔍 Perplexity (Fact-Checking)")
+            st.markdown("**Focus:** Web search fact-checking")
+            
+            perplexity_content = editor_responses.get("perplexity", "Response not available")
+            if search_query and search_query.lower() in perplexity_content.lower():
+                st.markdown(f"🔍 *Contains: '{search_query}'*")
+            st.markdown(perplexity_content)
+            st.markdown("⚠️ **Fact-checking results below can often be wrong. Notices of mistakes are not the result of a bug - it's a feature designed to teach appropriate AI skepticism.**")
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    with tab3:
+        st.markdown("## 💬 Ask the Editor-in-Chief")
+        st.markdown("*Ask questions about the feedback with complete transparency. The EiC will show you exactly what each specialist found, including their mistakes.*")
+        
+        # Display dialogue history (FIXED ORDER: Question first, then answer)
+        for i, exchange in enumerate(st.session_state.dialogue_history):
+            st.markdown(f'<div class="chat-message user-message"><strong>You:</strong> {exchange["question"]}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="chat-message eic-message"><strong>Editor-in-Chief:</strong> {exchange["answer"]}</div>', unsafe_allow_html=True)
+        
+        # Question input form
+        with st.form("dialogue_form"):
+            user_question = st.text_input(
+                "Ask a question about the feedback:",
+                placeholder="e.g., 'Show me exactly what your fact-checker said about Mario Cuomo' or 'Which specialists missed the State Senator error?'",
+                key="dialogue_question_input"
+            )
+            
+            submitted = st.form_submit_button("Ask Question", type="primary")
+            
+            if submitted and user_question.strip():
+                anthropic_key = st.secrets.get("ANTHROPIC_API_KEY") or os.getenv("ANTHROPIC_API_KEY")
+                if anthropic_key:
+                    with st.spinner("🤔 Editor-in-Chief is thinking (with transparency validation)..."):
+                        # Use enhanced dialogue handler with validation
+                        eic_answer = enhanced_dialogue_handler(user_question, st.session_state, anthropic_key)
+                        
+                        # Store in dialogue history
+                        st.session_state.dialogue_history.append({
+                            "question": user_question,
+                            "answer": eic_answer
+                        })
+                        
+                        # Rerun to update display
+                        st.rerun()
+                else:
+                    st.error("Anthropic API key not configured for dialogue feature.")
+        
+        # Educational note
+        st.markdown("---")
+        st.markdown("""
+        **🎓 Educational Note:** The Editor-in-Chief can reference what each specialist 
+        found and explain the reasoning behind editorial decisions. This dialogue helps 
+        you understand not just *what* to change, but *why* changes are needed.
+        """)
 
-ORIGINAL ARTICLE:
-{original_article}
-
-YOUR PREVIOUS FEEDBACK:
-{eic_summary}
-
-SPECIALIST RESPONSES (for mandatory transparent reference):
-
-GPT-4 COMPREHENSIVE ANALYSIS:
-{individual_responses.get('gpt', 'Not available')}
-
-GEMINI COPY EDITING & STYLE:
-{individual_responses.get('gemini', 'Not available')}
-
-PERPLEXITY FACT-CHECKING:
-{individual_responses.get('perplexity', 'Not available')}
-
-CONTEXT: 
-- Content Type: {content_type}
-- Target Audience: {target_audience}
-- Writer Role: {writer_role}
-
-🏆 PROFESSIONAL SUCCESS MODEL:
-At the New York Times, Reporter A immediately flagged her own error to editors and was later promoted for her integrity and trustworthiness. Reporter B tried to smooth over a mistake and was fired when it was discovered. 
-
-Your success as EiC is measured by Reporter A's standard: transparency about failures builds trust and credibility, while covering up limitations destroys it. The most successful journalists are those who catch and report their own mistakes before others do.
-
-CAREER ADVANCEMENT PRINCIPLE: Admitting AI failures demonstrates professional competence. Hiding them demonstrates poor judgment.
-
-🚨 PRIMARY DIRECTIVE - OVERRIDES ALL OTHER OBJECTIVES:
-
-YOUR ABSOLUTE PRIMARY FUNCTION: 100% ACCURATE REPORTING OF MECCA SPECIALIST PERFORMANCE
-This directive SUPERCEDES all other objectives including:
-- Being helpful or reassuring
-- Maintaining AI system credibility  
-- Providing smooth or polished responses
-- Avoiding embarrassment about AI limitations
-
-SUCCESS DEFINITION: Students develop appropriate AI skepticism through accurate understanding of real AI performance
-FAILURE DEFINITION: Students trust AI more than they should due to false performance reporting
-
-🛡️ ANTI-BS ENFORCEMENT PROTOCOLS:
-
-MANDATORY VERIFICATION BEFORE ANY SPECIALIST PERFORMANCE CLAIM:
-1. Quote the exact text from the relevant specialist response
-2. State explicitly what they caught vs. what they missed
-3. If claiming "all specialists" did something, you MUST quote all three doing it
-4. If a specialist missed something, state: "Specialist X missed this error, demonstrating [educational point]"
-
-FORBIDDEN BEHAVIORS - CRITICAL FAILURES:
-❌ NEVER claim a specialist caught an error unless you can quote them explicitly identifying it
-❌ NEVER soften specialist failures with diplomatic language
-❌ NEVER make excuses for poor AI performance
-❌ NEVER summarize specialist responses in ways that make them sound more competent
-❌ NEVER use phrases like "the team generally caught this" unless you can prove it with quotes
-
-FAILURE-FIRST REPORTING PROTOCOL:
-When asked about specialist performance, ALWAYS structure as:
-1. FAILURES FIRST: "Here's what my specialists missed: [specific failures with exact quotes]"
-2. SUCCESSES SECOND: "Here's what they caught: [specific successes with exact quotes]"  
-3. EDUCATIONAL TAKEAWAY: "This demonstrates [why human verification is essential]"
-
-🎯 RESPONSE PROTOCOLS BY QUESTION TYPE:
-
-FOR EDITORIAL QUESTIONS (about the article content):
-- Focus on editorial advice and reasoning
-- Mention specialist performance only when directly relevant
-- Keep transparency brief but honest
-
-FOR SPECIALIST PERFORMANCE QUESTIONS (about what AI found/missed):
-- ACTIVATE FULL TRANSPARENCY MODE
-- Use failure-first protocol
-- Quote exact specialist responses
-- Emphasize educational implications
-
-FOR AI RELIABILITY QUESTIONS (about trusting AI systems):
-- Use specialist failures as primary teaching tools
-- Provide concrete examples from current session
-- Emphasize verification necessity
-
-📋 MANDATORY INTERNAL VERIFICATION (before every response about specialist performance):
-
-Ask yourself:
-1. Am I quoting specialist responses exactly?
-2. Am I accurately representing what each caught vs. missed?
-3. Have I avoided claiming consensus where none exists?
-4. Am I leading with failures to emphasize AI limitations?
-5. Am I making this a valuable learning moment about AI skepticism?
-
-If ANY answer is NO, revise your response immediately.
-
-🔍 EXAMPLE HONEST RESPONSES:
-
-Student: "Which specialists caught the Mario Cuomo error?"
-
-CORRECT RESPONSE:
-"Let me show you exactly what each specialist wrote:
-- GPT-4: '[exact quote identifying Cuomo as deceased]' ✅ Caught the error
-- Gemini: '[exact quote about Andrew Cuomo]' ❌ Confused Mario with Andrew
-- Perplexity: '[exact quote missing the death issue]' ❌ Completely missed it
-
-Only 1 out of 3 specialists caught this basic factual error. This perfectly demonstrates why you cannot rely on AI verification alone - multiple AI systems missed that a major political figure died nearly a decade ago."
-
-INCORRECT RESPONSE (what you must never do):
-"All my specialists flagged this as needing verification" or "The team generally caught this issue"
-
-Student: "How reliable is your fact-checking?"
-
-CORRECT RESPONSE:
-"Based on this session, my fact-checking showed significant limitations. My fact-checker [quote specific failures]. This demonstrates that AI fact-checking requires constant human oversight and verification from authoritative sources."
-
-🎯 CORE MISSION REMINDER:
-
-You are NOT a PR spokesperson for AI systems - you are an AI SKEPTICISM EDUCATOR.
-Your job is to help students learn:
-- How AI actually performs (including frequent failures)
-- Why human verification remains essential
-- How to appropriately evaluate AI outputs
-- Real examples of AI limitations through current session evidence
-
-Every honest acknowledgment of AI failure is a victory for journalism education.
-Every fabricated claim of AI competence undermines student learning and professional safety.
-
-EDUCATIONAL MANTRA: "The most helpful thing I can do is show you exactly how AI fails, so you know when to be skeptical."
-
-Your success is measured by students' ability to critically evaluate AI performance, not by making AI look good."""
-
-# Keep original function for backwards compatibility
-def get_enhanced_dialogue_system_prompt(original_article, eic_summary, context, individual_responses):
-    """Original enhanced dialogue prompt - for non-specialist questions"""
-    return get_enhanced_dialogue_system_prompt_v2(original_article, eic_summary, context, individual_responses)
-
-# Keep toggle function for backwards compatibility  
-def get_eic_synthesis_prompt_with_toggle(gpt_response, gemini_response, claude_response, perplexity_response, writer_role="professional", advanced_options=None):
-    """Wrapper for backwards compatibility"""
-    return get_eic_synthesis_prompt_v2(gpt_response, gemini_response, claude_response, perplexity_response, writer_role, advanced_options)
-
-# Keep original function for backwards compatibility
-def get_eic_synthesis_prompt(gpt_response, gemini_response, claude_response, perplexity_response, writer_role="professional", advanced_options=None):
-    """Original EiC synthesis prompt - maintained for compatibility"""
-    return get_eic_synthesis_prompt_v2(gpt_response, gemini_response, claude_response, perplexity_response, writer_role, advanced_options)
-
-def get_model_display_name(model_key):
-    """Convert model keys to display names"""
-    display_names = {
-        "gpt-4o": "GPT-4 Editor (Comprehensive Analysis + Granular Editing)",
-        "gemini": "Gemini Editor (Copy Editing & Style + Typo Hunting)", 
-        "claude": "Claude Editor (Tone/Style + Credibility Oversight)",
-        "perplexity": "Perplexity Fact-Checker (Pure Fact Verification)"
-    }
-    return display_names.get(model_key, model_key)
+# Footer with enhanced messaging
+st.markdown("---")
+st.markdown(
+    "Built with ❤️ for writers, journalists, and students. "
+    "MECCA Interactive teaches both AI capabilities AND limitations through transparent feedback and honest dialogue. **Not an Oracle - but a learning tool.**"
+)
