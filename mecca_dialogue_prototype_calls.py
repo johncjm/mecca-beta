@@ -601,30 +601,7 @@ def get_model_display_name(model_key):
         "claude": "Claude Editor (Tone/Style + Credibility Oversight)",
         "perplexity": "Perplexity Fact-Checker (Pure Fact Verification)"
     }
-    return display_names.get(model_key, model_key)_role == "Copy Editor":
-            context_parts.append("Focus on grammar, style, accuracy, and publication readiness.")
-        elif editorial_role == "News Desk Editor":
-            context_parts.append("Apply newsroom standards with focus on speed, accuracy, and reader engagement.")
-        elif editorial_role == "Feature Editor":
-            context_parts.append("Emphasize storytelling, narrative flow, and feature-specific techniques.")
-        elif editorial_role == "Fact-Checker Focus":
-            context_parts.append("Prioritize verification and sourcing above all other concerns.")
-        elif editorial_role == "Style Editor":
-            context_parts.append("Focus primarily on voice, tone, and stylistic consistency.")
-    
-    return "\n".join(context_parts)
-
-def get_editorial_prompt(model_name, article_text, writer_role="professional", advanced_options=None):
-    """Generate enhanced model-specific prompts with organized, practical feedback requirements"""
-    
-    role_context = get_role_context(writer_role)
-    advanced_context = get_advanced_context(advanced_options)
-    
-    # Handle headline if provided
-    headline_section = ""
-    if advanced_options and advanced_options.get("headline"):
-        headline_section = f"""
-HEADLINE: {advanced_options['headline']}
+    return display_names.get(model_key, model_key)
 
 Please also evaluate the headline for:
 - Accuracy and clarity
