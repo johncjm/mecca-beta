@@ -1,7 +1,7 @@
 import streamlit as st
 import os
 from mecca_dialogue_prototype_calls import call_openai, call_anthropic, call_google, call_perplexity, enhanced_dialogue_handler
-from mecca_dialogue_prototype_prompts import get_editorial_prompt, get_eic_synthesis_prompt_v2
+from mecca_dialogue_prototype_prompts import get_editorial_prompt, get_eic_synthesis_prompt_v3
 
 # Configure page
 st.set_page_config(
@@ -571,7 +571,7 @@ Perplexity Fact-Checker Response:
         """
         
         # Call Claude as Editor-in-Chief with enhanced synthesis + toggle support
-        claude_eic_prompt = get_eic_synthesis_prompt_v2(gpt_response, gemini_response, "", perplexity_response, mapped_role, context)
+        claude_eic_prompt = get_eic_synthesis_prompt_v3(gpt_response, gemini_response, "", perplexity_response, mapped_role, context)
         claude_response = call_anthropic(claude_eic_prompt, combined_analysis, anthropic_key) if anthropic_key else "Anthropic API key not configured"
         
         # Store EiC response for dialogue
