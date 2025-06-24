@@ -265,4 +265,4 @@ if st.session_state.has_analysis:
         with st.form("dialogue_form"):
             user_question = st.text_input(
                 "Ask a question about the feedback:",
-                placeholder="e.g., 'Show me exactly what your fact-checker said about Mario
+                placeholder="e.g., 'Show me exactly what your fact-checker said about Mario Cuomo' or 'Which specialists missed the State Senator error?'",
