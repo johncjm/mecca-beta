@@ -20,42 +20,6 @@ initialize_session_state()
 # Load custom styles
 st.markdown(load_custom_styles(), unsafe_allow_html=True)
 
-def parse_eic_content(eic_response):
-    """Parse EiC response to separate quick fixes from full analysis"""
-    
-    # Look for our structured markers
-    quick_fixes_start = eic_response.find("<!-- QUICK_FIXES_START -->")
-    quick_fixes_end = eic_response.find("<!-- QUICK_FIXES_END -->")
-    full_analysis_start = eic_response.find("<!-- FULL_ANALYSIS_START -->")
-    full_analysis_end = eic_response.find("<!-- FULL_ANALYSIS_END -->")
-    
-    if quick_fixes_start != -1 and quick_fixes_end != -1:
-        quick_fixes_content = eic_response[quick_fixes_start+len("<!-- QUICK_FIXES_START -->"):quick_fixes_end].strip()
-    else:
-        # Fallback: extract Quick Fixes section manually
-        lines = eic_response.split('\n')
-        quick_fixes_lines = []
-        in_quick_fixes = False
-        
-        for line in lines:
-            if '🎯 QUICK FIXES NEEDED' in line:
-                in_quick_fixes = True
-                quick_fixes_lines.append(line)
-            elif in_quick_fixes and (line.startswith('EDITORIAL SUMMARY') or line.startswith('PRIORITY ACTION LIST')):
-                break
-            elif in_quick_fixes:
-                quick_fixes_lines.append(line)
-        
-        quick_fixes_content = '\n'.join(quick_fixes_lines)
-    
-    if full_analysis_start != -1 and full_analysis_end != -1:
-        full_analysis_content = eic_response[full_analysis_start+len("<!-- FULL_ANALYSIS_START -->"):full_analysis_end].strip()
-    else:
-        # Fallback: use entire response
-        full_analysis_content = eic_response
-    
-    return quick_fixes_content, full_analysis_content
-
 # Main header
 st.markdown('<div class="main-header">📝 MECCA Interactive Prototype</div>', unsafe_allow_html=True)
 
@@ -164,7 +128,7 @@ Perplexity Fact-Checker Response:
 {perplexity_response}
         """
         
-        # Call Claude as Editor-in-Chief with enhanced synthesis + toggle support
+        # Call Claude as Editor-in-Chief with enhanced synthesis
         claude_eic_prompt = get_eic_synthesis_prompt_v3(gpt_response, gemini_response, "", perplexity_response, mapped_role, context)
         claude_response = call_anthropic(claude_eic_prompt, combined_analysis, anthropic_key) if anthropic_key else "Anthropic API key not configured"
         
@@ -188,6 +152,10 @@ if st.session_state.has_analysis:
     # Step 3 header
     st.markdown('<div class="section-header">📋 Step 3: Your Editorial Feedback</div>', unsafe_allow_html=True)
     
+    # Initialize tab state if not exists
+    if 'active_tab' not in st.session_state:
+        st.session_state.active_tab = 0
+    
     # Create tabs for organized feedback display
     tab1, tab2, tab3 = st.tabs([
         "📋 Editor-in-Chief Overview", 
@@ -199,7 +167,7 @@ if st.session_state.has_analysis:
         st.markdown("## 📋 Editor-in-Chief Summary")
         st.markdown("*Synthesis of all editorial feedback using the 'embarrassment test' for prioritization*")
         
-        # Display EiC content (toggle removed as per user decision)
+        # Display EiC content directly (no parsing needed)
         st.markdown(st.session_state.eic_summary)
         
         # Navigation hints
@@ -253,6 +221,11 @@ if st.session_state.has_analysis:
             st.markdown("⚠️ **Fact-checking results below can often be wrong. Notices of mistakes are not the result of a bug - it's a feature designed to teach appropriate AI skepticism.**")
     
     with tab3:
+        # Set active tab when this tab is accessed
+        if st.session_state.get('form_submitted', False):
+            st.session_state.active_tab = 2
+            st.session_state.form_submitted = False
+            
         st.markdown("## 💬 Ask the Editor-in-Chief")
         st.markdown("*Ask questions about the feedback with complete transparency. The EiC will show you exactly what each specialist found, including their mistakes.*")
         
@@ -275,6 +248,9 @@ if st.session_state.has_analysis:
                 anthropic_key = st.secrets.get("ANTHROPIC_API_KEY") or os.getenv("ANTHROPIC_API_KEY")
                 if anthropic_key:
                     with st.spinner("🤔 Editor-in-Chief is thinking (with transparency validation)..."):
+                        # Set flag to stay on this tab after rerun
+                        st.session_state.form_submitted = True
+                        
                         # Use enhanced dialogue handler with validation
                         eic_answer = enhanced_dialogue_handler(user_question, st.session_state, anthropic_key)
                         
