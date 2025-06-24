@@ -166,7 +166,7 @@ def get_eic_synthesis_prompt_v2(gpt_response, gemini_response, claude_response, 
 def get_eic_synthesis_prompt_v3(gpt_response, gemini_response, claude_response, perplexity_response, writer_role, context):
     """
     Enhanced Editor-in-Chief synthesis prompt with streamlined structure and professional tone.
-    Eliminates error counts, reduces redundancy, focuses on actionable guidance with embedded learning.
+    Fixed: Toggle functionality and bullet point formatting.
     """
     
     # Build context information
@@ -199,12 +199,19 @@ GPT-4 Response: {gpt_response}
 Gemini Response: {gemini_response}
 Perplexity Response: {perplexity_response}
 
-OUTPUT STRUCTURE:
+CRITICAL FORMATTING REQUIREMENTS:
+- You MUST use the exact HTML comment markers shown below
+- Priority Actions MUST be separate bullet points, not one paragraph
+- Each bullet point MUST start with "• Para X:"
+
+OUTPUT STRUCTURE - FOLLOW EXACTLY:
 
 <!-- QUICK_FIXES_START -->
 🎯 PRIORITY ACTIONS
-[List 5-8 most important issues in this format:]
-Para X: [CATEGORY] Specific change → Brief explanation why this matters
+
+• Para X: [CATEGORY] Specific change → Brief explanation why this matters
+• Para Y: [CATEGORY] Specific change → Brief explanation why this matters  
+• Para Z: [CATEGORY] Specific change → Brief explanation why this matters
 
 Categories: [CRITICAL], [FACT-CHECK], [CLARITY], [STYLE], [GRAMMAR]
 
@@ -219,12 +226,17 @@ Examples:
 Brief overall assessment focusing on the piece's main strengths and key development areas. Keep this focused on what matters most for this writer's growth.
 
 🎯 PRIORITY ACTIONS
-[Same as above - repeated for full analysis view]
+
+• Para X: [CATEGORY] Specific change → Brief explanation why this matters
+• Para Y: [CATEGORY] Specific change → Brief explanation why this matters
+• Para Z: [CATEGORY] Specific change → Brief explanation why this matters
+
+(Same bullet points as above - repeated for full analysis view)
 
 🔍 VERIFICATION RESOURCES
 [Only if fact-checking issues exist - provide specific, actionable steps:]
 • Check [specific database/source] for [specific claim type]
-• Cross-reference [specific detail] with [suggested authoritative source]
+• Cross-reference [specific detail] with [suggested authoritative source]  
 • Verify [specific claim] through [recommended method]
 
 🤖 AI PERFORMANCE INSIGHTS
@@ -234,6 +246,8 @@ Brief overall assessment focusing on the piece's main strengths and key developm
 • [Specialist] incorrectly flagged [item] - example of AI overconfidence in [specific domain]
 
 Use baseball-error philosophy: AI mistakes are normal data points worth noting and learning from, not moral failures requiring apologies.
+
+{encouragement_note}
 <!-- FULL_ANALYSIS_END -->
 
 CRITICAL TONE GUIDELINES:
@@ -255,8 +269,6 @@ PRIORITY RANKING:
 2. Clarity problems that impede reader understanding
 3. Style issues that affect professional presentation
 4. Grammar/mechanical issues
-
-{encouragement_note}
 
 Remember: Your role is helping writers improve their current piece while building long-term editorial judgment. Focus on actionable guidance with embedded learning rather than abstract lessons."""
 
