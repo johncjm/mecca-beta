@@ -266,3 +266,40 @@ if st.session_state.has_analysis:
             user_question = st.text_input(
                 "Ask a question about the feedback:",
                 placeholder="e.g., 'Show me exactly what your fact-checker said about Mario Cuomo' or 'Which specialists missed the State Senator error?'",
+                key="dialogue_question_input"
+            )
+            
+            submitted = st.form_submit_button("Ask Question", type="primary")
+            
+            if submitted and user_question.strip():
+                anthropic_key = st.secrets.get("ANTHROPIC_API_KEY") or os.getenv("ANTHROPIC_API_KEY")
+                if anthropic_key:
+                    with st.spinner("🤔 Editor-in-Chief is thinking (with transparency validation)..."):
+                        # Use enhanced dialogue handler with validation
+                        eic_answer = enhanced_dialogue_handler(user_question, st.session_state, anthropic_key)
+                        
+                        # Store in dialogue history
+                        st.session_state.dialogue_history.append({
+                            "question": user_question,
+                            "answer": eic_answer
+                        })
+                        
+                        # Rerun to update display
+                        st.rerun()
+                else:
+                    st.error("Anthropic API key not configured for dialogue feature.")
+        
+        # Educational note
+        st.markdown("---")
+        st.markdown("""
+        **🎓 Educational Note:** The Editor-in-Chief can reference what each specialist 
+        found and explain the reasoning behind editorial decisions. This dialogue helps 
+        you understand not just *what* to change, but *why* changes are needed.
+        """)
+
+# Footer with enhanced messaging
+st.markdown("---")
+st.markdown(
+    "Built with ❤️ for writers, journalists, and students. "
+    "MECCA Interactive teaches both AI capabilities AND limitations through transparent feedback and honest dialogue. **Not an Oracle - but a learning tool.**"
+)
