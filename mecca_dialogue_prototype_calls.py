@@ -67,7 +67,7 @@ def call_google(prompt, api_key):
         return f"Google API Error: {str(e)}"
 
 def call_perplexity(prompt, api_key):
-    """Call Perplexity API"""
+    """Call Perplexity API (will be replaced by Custom Fact-Checking Coach)"""
     if not api_key:
         return "Perplexity API key not configured"
     
@@ -107,6 +107,81 @@ def call_perplexity(prompt, api_key):
             
     except Exception as e:
         return f"Perplexity API Error: {str(e)}"
+
+def call_custom_fact_checking_coach(prompt, openai_key, bing_key=None):
+    """
+    Custom Fact-Checking Coach using GPT-4o-mini + Bing Search API
+    Placeholder implementation - will be fully developed when Bing API key is available
+    """
+    if not openai_key:
+        return "OpenAI API key not configured for Custom Fact-Checking Coach"
+    
+    # TODO: Implement Bing Search integration when API key is available
+    if not bing_key:
+        # Placeholder response showing the intended functionality
+        return """**Custom Fact-Checking Coach (Placeholder Implementation)**
+
+This is a preview of the Custom Fact-Checking Coach that will replace Perplexity. When fully implemented, it will:
+
+**VERIFICATION METHODOLOGY APPROACH:**
+• Extract key factual claims from content
+• Search current sources via Bing Search API  
+• Provide verification coaching, not definitive answers
+• Focus on "Known vs. Unknown" framework
+
+**CURRENT STATUS:** Awaiting Bing Search API integration
+
+**EDUCATIONAL NOTE:** This coach teaches verification methodology rather than claiming fact-checking authority. It will guide writers through proper verification processes while maintaining appropriate skepticism about AI capabilities.
+
+**PLACEHOLDER GUIDANCE:**
+• Always verify claims independently through authoritative sources
+• Cross-reference multiple sources for controversial claims
+• Be especially cautious with statistics, dates, and proper names
+• Consider the publication date and currency of sources
+
+*Full implementation pending Bing Search API key configuration.*"""
+    
+    try:
+        # When Bing API is available, this will extract claims, search, and provide coaching
+        client = openai.OpenAI(api_key=openai_key)
+        
+        coaching_prompt = f"""You are a Fact-Checking Coach focused on verification methodology, not definitive fact-checking.
+
+Your role is to teach verification processes and help identify what needs checking, NOT to declare claims true or false.
+
+METHODOLOGY FOCUS:
+- Extract key factual claims that need verification
+- Suggest appropriate verification methods and sources
+- Identify gaps in sourcing or attribution
+- Provide "Known vs. Unknown" framework analysis
+
+BE TRANSPARENT about limitations:
+- You cannot access current web data
+- You cannot definitively verify claims
+- Your role is coaching methodology, not providing answers
+
+Content to analyze for verification methodology:
+{prompt}"""
+        
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are a verification methodology coach, not a fact-checker."},
+                {"role": "user", "content": coaching_prompt}
+            ],
+            max_tokens=1500,
+            temperature=0.3
+        )
+        
+        base_response = response.choices[0].message.content.strip()
+        
+        # Add implementation note
+        return f"""{base_response}
+
+**IMPLEMENTATION NOTE:** This is the Custom Fact-Checking Coach running on GPT-4o-mini. Full web search capabilities will be added when Bing Search API is configured."""
+        
+    except Exception as e:
+        return f"Custom Fact-Checking Coach Error: {str(e)}"
 
 class MECCAResponseValidator:
     """Validates EiC responses for transparency and accuracy"""
