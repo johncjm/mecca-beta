@@ -5,10 +5,7 @@ from mecca_dialogue_prototype_calls import call_openai, call_anthropic, call_goo
 from mecca_dialogue_prototype_prompts import get_editorial_prompt, get_eic_synthesis_prompt_v3, get_story_conference_prompt, get_story_eic_synthesis_prompt
 from ui.styles import load_custom_styles
 from core.session_manager import initialize_session_state, reset_analysis_state
-from mecca_dialogue_prototype_calls import call_openai, call_anthropic, call_google, call_perplexity, enhanced_dialogue_handler
-from mecca_dialogue_prototype_prompts import get_editorial_prompt, get_eic_synthesis_prompt_v3, get_story_conference_prompt, get_story_eic_synthesis_prompt
-from ui.styles import load_custom_styles
-from core.session_manager import initialize_session_state, reset_analysis_state
+from custom_fcc import call_custom_fcc_integrated
 
 # Configure page
 st.set_page_config(
