@@ -1,17 +1,15 @@
 import streamlit as st
 import os
 try:
-    import ui.forms as forms_module
+ from temp_forms import render_user_context_form, render_article_input, render_story_conference_form
     st.write("✅ Forms module imported successfully")
-    st.write("Available functions:", dir(forms_module))
-    st.write("Has render_story_conference_form:", hasattr(forms_module, 'render_story_conference_form'))
+    st.write("Has render_story_conference_form: True")
 except Exception as e:
     st.write(f"❌ Forms import failed: {e}")
     st.write(f"Current working directory: {os.getcwd()}")
 from mecca_dialogue_prototype_calls import call_openai, call_anthropic, call_google, call_perplexity, enhanced_dialogue_handler
 from mecca_dialogue_prototype_prompts import get_editorial_prompt, get_eic_synthesis_prompt_v3, get_story_conference_prompt, get_story_eic_synthesis_prompt
 from ui.styles import load_custom_styles
-from ui.forms import render_user_context_form, render_article_input, render_story_conference_form
 from core.session_manager import initialize_session_state, reset_analysis_state
 
 # Configure page
