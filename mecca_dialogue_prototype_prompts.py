@@ -1,5 +1,5 @@
 def get_editorial_prompt(model_key, article_text, writer_role, context):
-    """Generate model-specific editorial prompts with role adaptation and context"""
+    """Generate model-specific editorial prompts with role adaptation and context, now enforcing basics-first hierarchy"""
     
     # Map display names to model keys
     display_names = {
@@ -69,38 +69,42 @@ This custom context takes TOP PRIORITY - override default role boundaries if nee
         tone_guidance = "professional and direct, recognizing what works while addressing concerns"
     
     # Model-specific specializations with critical overlap
-    if model_key == "gpt-4o":
-        model_specialty = f"""
-COMPREHENSIVE ANALYSIS SPECIALIST
+    model_specialty = f"""
+PRIMARY ROLE: {editorial_role}
 Primary expertise: {role_info['primary_focus']}
-Critical safety net: {role_info['secondary']}
-
-Your comprehensive approach should thoroughly analyze the piece while maintaining focus on your editorial role as {editorial_role}.
-Always flag issues that could damage credibility, regardless of your primary focus area.
-Recognize solid journalistic instincts and strong elements while addressing concerns.
+Critical oversight: {role_info['secondary']}
+You are responsible for ensuring both foundational quality and advanced editorial insight.
 """
-        
-    elif model_key == "gemini":
-        model_specialty = f"""
-COPY EDITING & STYLE SPECIALIST  
-Primary expertise: {role_info['primary_focus']}
-Critical safety net: {role_info['secondary']}
+    
+    # FUNDAMENTALS FIRST BLOCK - The key addition from ChatGPT's patch
+    basics_first_block = """
+---
+🔍 SECTION 1: FUNDAMENTALS FIRST - Do Not Skip
+Before anything else, carefully review for basic professional standards:
+- Spelling errors (e.g. "That'ss", "jjoined")
+- Simple grammar and punctuation mistakes
+- Basic factual errors (names, dates, places)
+- Clarity problems in sentence construction
+- Misleading or missing attribution
 
-Focus on language precision, style consistency, and editorial polish while maintaining awareness of {editorial_role} perspective.
-Always flag issues that could damage credibility, regardless of your primary focus area.
-Note what's working well in the writing craft while providing improvement guidance.
+Flag all basic issues before moving to advanced guidance. These are non-negotiable.
+---
 """
-        
-    elif model_key == "perplexity":
-        model_specialty = f"""
-FACT-CHECKING & VERIFICATION SPECIALIST
-Primary expertise: Real-time web search for fact-checking and source verification
-Critical safety net: Flag critical issues in any area that could embarrass the publication
+    
+    # ADVANCED GUIDANCE BLOCK 
+    advanced_guidance = f"""
+✍️ SECTION 2: ADVANCED EDITORIAL GUIDANCE
+Now provide specialized analysis based on your editorial role:
+- Address your primary editorial focus in depth
+- Include paragraph-specific suggestions with explanations
+- Be specific, clear, and helpful
 
-Use your web search capabilities to verify factual claims while maintaining awareness of {editorial_role} perspective.
-IMPORTANT: Your fact-checking can be unreliable. Be honest about limitations and uncertainty.
-Always flag issues that could damage credibility, regardless of your primary focus area.
-Acknowledge solid sourcing practices while identifying verification needs.
+Examples:
+• Para 2: [GRAMMAR] Replace "their" with "there" - homophone error undermines credibility
+• Para 6: [CLARITY] Sentence too long (54 words) - consider breaking in two
+• Para 9: [FACTUAL] Misidentifies Mario Cuomo as current governor - update to Kathy Hochul
+
+{encouragement}
 """
     
     # Quote guidance section
@@ -121,7 +125,7 @@ Inappropriate quote control includes:
 Focus on editorial value, not content control.
 """
     
-    # Generate the complete prompt
+    # Generate the complete prompt with fundamentals-first structure
     prompt = f"""{custom_override}
 
 You are an expert editorial assistant working as part of MECCA (Multiple Edit and Cross-Check Assistant). 
@@ -136,16 +140,8 @@ Tone: {tone_guidance}
 
 {quote_guidance}
 
-RESPONSE FORMAT:
-Provide specific, actionable feedback with paragraph references. Focus on your area of expertise while maintaining awareness of critical issues that could damage credibility.
-
-Examples of good feedback:
-• "Para 3: The phrase 'sources say' is too vague for attribution - specify which sources"
-• "Para 7: This contradicts your earlier statement in Para 2 about the timeline"  
-• "Para 12: Consider breaking this 45-word sentence into two for better readability"
-
-Be specific about what to change and briefly explain why it matters.
-{encouragement}
+{basics_first_block}
+{advanced_guidance}
 
 CRITICAL OVERSIGHT RESPONSIBILITY:
 While focusing on your specialty, always flag:
