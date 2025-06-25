@@ -219,7 +219,7 @@ def render_story_conference_form():
         core_questions["why_now"] = st.text_area(
             "**4. Why now?** (timing and urgency)",
             placeholder="What makes this timely? What's the news hook? Why should this be prioritized?",
-            height=60,
+            height=68,
             help="What creates urgency or timeliness for this story?"
         )
 
