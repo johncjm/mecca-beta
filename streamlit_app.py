@@ -1,7 +1,7 @@
 import streamlit as st
 import os
 from temp_forms import render_user_context_form, render_article_input, render_story_conference_form
-from mecca_dialogue_prototype_calls import call_openai, call_anthropic, call_google, call_perplexity, enhanced_dialogue_handler
+from mecca_dialogue_prototype_calls import call_openai, call_anthropic, call_google, enhanced_dialogue_handler
 from mecca_dialogue_prototype_prompts import get_editorial_prompt, get_eic_synthesis_prompt_v3, get_story_conference_prompt, get_story_eic_synthesis_prompt
 from ui.styles import load_custom_styles
 from core.session_manager import initialize_session_state, reset_analysis_state
@@ -46,8 +46,8 @@ with st.expander("📖 Learn More About MECCA Interactive"):
     
     **📝 Article Editing Mode:**
     • **GPT-4 (Comprehensive Analysis)**: Organization, structure, comprehensive review
-    • **Gemini (Copy Editing & Style)**: Grammar, style, tone, language clarity
-    • **Perplexity (Fact-Checking)**: Web search verification (with reliability monitoring)
+    • **Gemini (Copy & Style Editor)**: Grammar, style, tone, language clarity
+    • **Custom FCC (Verification Coach)**: Methodology coaching for fact-checking
     • **Claude (Editor-in-Chief)**: Synthesizes feedback + answers your questions
     
     **Enhanced Features:**
@@ -96,7 +96,8 @@ if content_mode == "Story Idea (pitch/concept)":
                 openai_key = st.secrets.get("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY")
                 anthropic_key = st.secrets.get("ANTHROPIC_API_KEY") or os.getenv("ANTHROPIC_API_KEY") 
                 google_key = st.secrets.get("GOOGLE_API_KEY") or os.getenv("GOOGLE_API_KEY")
-                perplexity_key = st.secrets.get("PERPLEXITY_API_KEY") or os.getenv("PERPLEXITY_API_KEY")
+                google_search_key = st.secrets.get("GOOGLE_SEARCH_API_KEY") or os.getenv("GOOGLE_SEARCH_API_KEY")
+                google_search_engine_id = st.secrets.get("GOOGLE_SEARCH_ENGINE_ID") or os.getenv("GOOGLE_SEARCH_ENGINE_ID")
                 
                 # Prepare context for story conference
                 story_context = {
@@ -127,17 +128,24 @@ if content_mode == "Story Idea (pitch/concept)":
                 # Call models with story conference prompts
                 gpt_response = call_openai(get_story_conference_prompt("gpt-4o", story_data, mapped_role, story_context), openai_key) if openai_key else "OpenAI API key not configured"
                 gemini_response = call_google(get_story_conference_prompt("gemini", story_data, mapped_role, story_context), google_key) if google_key else "Google API key not configured"
-                perplexity_response = call_perplexity(get_story_conference_prompt("perplexity", story_data, mapped_role, story_context), perplexity_key) if perplexity_key else "Perplexity API key not configured"
+                
+                # Use Custom FCC instead of Perplexity
+                custom_fcc_response = call_custom_fcc_integrated(
+                    get_story_conference_prompt("perplexity", story_data, mapped_role, story_context), 
+                    openai_key, 
+                    google_search_key, 
+                    google_search_engine_id
+                ) if openai_key and google_search_key and google_search_engine_id else "Custom FCC configuration incomplete"
                 
                 # Store responses
                 st.session_state.editor_responses = {
                     "gpt": gpt_response,
                     "gemini": gemini_response, 
-                    "perplexity": perplexity_response
+                    "custom_fcc": custom_fcc_response
                 }
                 
                 # EiC synthesis for story conference
-                claude_eic_prompt = get_story_eic_synthesis_prompt(gpt_response, gemini_response, perplexity_response, mapped_role, story_context)
+                claude_eic_prompt = get_story_eic_synthesis_prompt(gpt_response, gemini_response, custom_fcc_response, mapped_role, story_context)
                 combined_analysis = f"""
 GPT-4 Story Analysis:
 {gpt_response}
@@ -145,8 +153,8 @@ GPT-4 Story Analysis:
 Gemini Story Analysis:
 {gemini_response}
 
-Perplexity Story Analysis:
-{perplexity_response}
+Custom FCC Analysis:
+{custom_fcc_response}
                 """
                 
                 claude_response = call_anthropic(claude_eic_prompt, combined_analysis, anthropic_key) if anthropic_key else "Anthropic API key not configured"
@@ -171,7 +179,8 @@ else:
             openai_key = st.secrets.get("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY")
             anthropic_key = st.secrets.get("ANTHROPIC_API_KEY") or os.getenv("ANTHROPIC_API_KEY") 
             google_key = st.secrets.get("GOOGLE_API_KEY") or os.getenv("GOOGLE_API_KEY")
-            perplexity_key = st.secrets.get("PERPLEXITY_API_KEY") or os.getenv("PERPLEXITY_API_KEY")
+            google_search_key = st.secrets.get("GOOGLE_SEARCH_API_KEY") or os.getenv("GOOGLE_SEARCH_API_KEY")
+            google_search_engine_id = st.secrets.get("GOOGLE_SEARCH_ENGINE_ID") or os.getenv("GOOGLE_SEARCH_ENGINE_ID")
             
             # Prepare context for models
             context = {
@@ -204,13 +213,20 @@ else:
             # Call individual models with enhanced prompts
             gpt_response = call_openai(get_editorial_prompt("gpt-4o", article_text, mapped_role, context), openai_key) if openai_key else "OpenAI API key not configured"
             gemini_response = call_google(get_editorial_prompt("gemini", article_text, mapped_role, context), google_key) if google_key else "Google API key not configured"
-            perplexity_response = call_perplexity(get_editorial_prompt("perplexity", article_text, mapped_role, context), perplexity_key) if perplexity_key else "Perplexity API key not configured"
+            
+            # Use Custom FCC instead of Perplexity
+            custom_fcc_response = call_custom_fcc_integrated(
+                get_editorial_prompt("perplexity", article_text, mapped_role, context), 
+                openai_key, 
+                google_search_key, 
+                google_search_engine_id
+            ) if openai_key and google_search_key and google_search_engine_id else "Custom FCC configuration incomplete"
             
             # Store editor responses in session state
             st.session_state.editor_responses = {
                 "gpt": gpt_response,
                 "gemini": gemini_response,
-                "perplexity": perplexity_response
+                "custom_fcc": custom_fcc_response
             }
             
             # Prepare combined responses for EiC
@@ -221,12 +237,12 @@ GPT-4 Editor Response:
 Gemini Editor Response:
 {gemini_response}
 
-Perplexity Fact-Checker Response:
-{perplexity_response}
+Custom FCC Response:
+{custom_fcc_response}
             """
             
             # Call Claude as Editor-in-Chief with enhanced synthesis
-            claude_eic_prompt = get_eic_synthesis_prompt_v3(gpt_response, gemini_response, "", perplexity_response, mapped_role, context)
+            claude_eic_prompt = get_eic_synthesis_prompt_v3(gpt_response, gemini_response, "", custom_fcc_response, mapped_role, context)
             claude_response = call_anthropic(claude_eic_prompt, combined_analysis, anthropic_key) if anthropic_key else "Anthropic API key not configured"
             
             # Store EiC response for dialogue
@@ -241,7 +257,7 @@ if st.session_state.has_analysis:
     # Enhanced AI Disclaimer
     st.markdown("""
     <div class="ai-disclaimer">
-    <strong>⚠️ IMPORTANT: MECCA's fact-checking is experimental and often unreliable -- as is the case currently with all AI fact-checking programs. Treat all factual claims as suggestions requiring independent verification. We strive to uncover those errors and show them to you as illustrations of AI limitations in real-time as part of our educational mission.</strong><br>
+    <strong>⚠️ IMPORTANT: MECCA's verification coaching is experimental and educational. All verification suggestions require independent confirmation. We demonstrate AI capabilities AND limitations as part of our educational mission.</strong><br>
     This AI-generated feedback is advisory only and includes validation monitoring. The writer maintains full responsibility for fact-checking, editorial decisions, and final content. MECCA shows you exactly what each AI found (including their mistakes) to teach appropriate skepticism about AI verification.
     </div>
     """, unsafe_allow_html=True)
@@ -350,21 +366,21 @@ if st.session_state.has_analysis:
         
         with col3:
             if st.session_state.get('content_mode') == 'story':
-                st.markdown("#### 🔍 Perplexity (Reporting Strategy)")
-                st.markdown("**Focus:** Fact-checking methodology, verification approach")
+                st.markdown("#### 🔍 Custom FCC (Verification Coach)")
+                st.markdown("**Focus:** Verification methodology, sourcing strategy")
             else:
-                st.markdown("#### 🔍 Perplexity (Fact-Checking)")
-                st.markdown("**Focus:** Web search fact-checking")
+                st.markdown("#### 🔍 Custom FCC (Verification Coach)")
+                st.markdown("**Focus:** Verification methodology coaching")
             
-            perplexity_content = editor_responses.get("perplexity", "Response not available")
-            if search_query and search_query.lower() in perplexity_content.lower():
+            custom_fcc_content = editor_responses.get("custom_fcc", editor_responses.get("perplexity", "Response not available"))
+            if search_query and search_query.lower() in custom_fcc_content.lower():
                 st.markdown(f"🔍 *Contains: '{search_query}'*")
-            st.markdown(perplexity_content)
+            st.markdown(custom_fcc_content)
             
             if st.session_state.get('content_mode') == 'story':
                 st.markdown("💡 **Ask the EiC:** 'What's your verification roadmap for this story?'")
             else:
-                st.markdown("⚠️ **Fact-checking results below can often be wrong. Notices of mistakes are not the result of a bug - it's a feature designed to teach appropriate AI skepticism.**")
+                st.markdown("⚠️ **Verification coaching is educational - always verify claims independently through authoritative sources.**")
         
         # Final dialogue encouragement for story mode
         if st.session_state.get('content_mode') == 'story':
@@ -400,7 +416,7 @@ if st.session_state.has_analysis:
                 placeholder_text = "e.g., 'Why did you rate this as promising but risky?' or 'How would you approach the access challenges?' or 'What if I focused on the economic impact instead?'"
                 help_text = "Ask WHY as well as WHAT. The Editor-in-Chief can explain editorial reasoning and help develop your story concept."
             else:
-                placeholder_text = "e.g., 'Show me exactly what your fact-checker said about Mario Cuomo' or 'Which specialists missed the State Senator error?'"
+                placeholder_text = "e.g., 'Explain the Custom FCC's verification approach' or 'Which specialists agreed on this issue?' or 'How should I prioritize these suggestions?'"
                 help_text = "Ask about specific feedback, reasoning behind suggestions, or request clarification on any editorial advice."
             
             user_question = st.text_input(
@@ -504,7 +520,7 @@ with st.sidebar:
                 - "Why is [specific concern] the top priority?"
                 - "How would you develop this story concept?"
                 - "What if I focused on [different angle]?"
-                - "Walk me through the reporting strategy"
+                - "Walk me through the verification strategy"
                 - "What makes similar stories succeed?"
                 """)
             else:
@@ -513,7 +529,7 @@ with st.sidebar:
                 - "Why is [specific concern] the top priority?"
                 - "How would you approach [difficult issue]?"
                 - "What if I took a different approach?"
-                - "Walk me through your reasoning on [topic]"
+                - "Explain the Custom FCC's methodology"
                 - "What would make this piece stronger?"
                 """)
 
