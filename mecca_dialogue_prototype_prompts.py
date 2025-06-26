@@ -164,27 +164,35 @@ Article to review:
 
 def get_gemini_error_detection_utility(article_text):
     """
-    Ultra-simple error detection utility for Gemini.
-    No custom context, no identity complexity, no editorial aspirations.
-    Maximum reliability copy editing only.
+    Ultra-simple error detection utility for Gemini with educational component.
+    Completely isolated from custom context - maximum reliability utility.
     """
     
-    prompt = f"""You are an error detection system. Your only function is identifying mechanical errors in text.
+    prompt = f"""You are a high-precision error detection utility. Your only function is to identify and report mechanical errors in text.
 
-SCAN FOR:
+SCAN FOR THE FOLLOWING ITEMS ONLY:
 • Spelling mistakes
-• Missing or extra spaces  
-• Wrong words (homophones like their/there, incorrect words like "doubled" for "troubled")
+• Missing or extra spaces
+• Wrong words (homophones, incorrect word choices)
 • Grammar errors (subject-verb agreement, tense, pronouns)
 • Punctuation errors
 
 MANDATORY OUTPUT FORMAT:
-Para [number]: [ERROR_TYPE] "[wrong text]" → "[correct text]"
+Your entire response MUST be a list of corrections. Each correction must follow this exact format:
+Para [number]: [ERROR_TYPE] | "[wrong text]" → "[correct text]" | Reason: [Concise reason]
 
-If no errors found: "NO ERRORS DETECTED"
+VALID REASONS: Spelling, Spacing, Wrong Word, Grammar, Punctuation.
+Do not use any other reasons.
+
+EXAMPLE:
+Para 5: WRONG_WORD | "deeply doubled" → "deeply troubled" | Reason: Wrong Word
+Para 7: SPACING | "toHanif's" → "to Hanif's" | Reason: Spacing
+Para 9: GRAMMAR | "officials was" → "officials were" | Reason: Grammar
+
+If no errors are found, respond with: "NO ERRORS DETECTED"
 
 ABSOLUTE PROHIBITION:
-Any text outside the specified format will be considered a system failure. Do not provide commentary, analysis, explanations, or suggestions beyond error correction. Your response must contain ONLY the error list or "NO ERRORS DETECTED".
+Your response must contain ONLY the list of corrections in the specified format or "NO ERRORS DETECTED". Any commentary, analysis, explanation, or text outside this rigid structure is a system failure.
 
 TEXT TO SCAN:
 {article_text}"""
